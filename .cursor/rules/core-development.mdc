@@ -1,6 +1,6 @@
 ---
-alwaysApply: true
 description: Core development patterns and standards for Waidrin
+globs: **/*.ts,**/*.tsx
 ---
 
 # Core Development Standards

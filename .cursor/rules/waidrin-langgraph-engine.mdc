@@ -1,6 +1,6 @@
 ---
 description: Waidrin LangGraph Engine development patterns and architecture
-alwaysApply: true
+globs: lib/**/*.ts
 ---
 
 # Waidrin LangGraph Engine

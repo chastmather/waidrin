@@ -1,6 +1,6 @@
 ---
 description: Error handling patterns and best practices for Waidrin LangGraph engine
-alwaysApply: true
+globs: lib/**/*.ts,components/**/*.tsx,app/**/*.tsx
 ---
 
 # Error Handling Patterns

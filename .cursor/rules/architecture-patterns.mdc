@@ -1,6 +1,6 @@
 ---
-alwaysApply: true
 description: Architecture patterns and design principles for Waidrin
+globs: lib/**/*.ts,components/**/*.tsx
 ---
 
 # Architecture Patterns

@@ -1,5 +1,6 @@
 ---
-alwaysApply: true
+description: Development workflow and best practices for Waidrin
+globs: **/*.ts,**/*.tsx
 ---
 
 # Waidrin Development Workflow

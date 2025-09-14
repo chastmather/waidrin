@@ -1,6 +1,6 @@
 ---
-alwaysApply: true
 description: Comprehensive overview of Waidrin architecture and development patterns
+globs: lib/**/*.ts,app/**/*.tsx,components/**/*.tsx
 ---
 
 # Waidrin Development Overview

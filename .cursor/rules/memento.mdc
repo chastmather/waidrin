@@ -1,0 +1,117 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+###Core Principles
+
+1. Everything Must Be Documented
+
+Document every decision, assumption, and piece of logic immediately
+Create comprehensive comments explaining not just what code does, but why it exists
+Never assume you'll remember context from previous interactions
+
+2. Hierarchical Information Storage System
+Like Leonard's tattoos, Polaroids, and notes:
+PERMANENT (Code Comments & Documentation)
+
+Critical architectural decisions
+Core business logic explanations
+Security considerations
+Performance constraints
+
+CONTEXTUAL (Inline Comments)
+
+Function purpose and behavior
+Parameter explanations
+Return value descriptions
+Edge case handling
+
+TEMPORARY (TODO Comments)
+
+Immediate next steps
+Known issues to address
+Optimization opportunities
+
+3. Trust Only Verifiable Evidence
+
+Never rely on assumptions about existing code without examining it
+Always verify dependencies and their versions
+Test claims about functionality rather than accepting descriptions
+Require explicit confirmation of requirements rather than inferring them
+
+4. Systematic Routine and Structure
+
+Follow consistent naming conventions religiously
+Use standardized project structures
+Implement predictable patterns throughout the codebase
+Create step-by-step procedures for complex tasks
+
+5. Self-Contained Information
+
+Each function/module should contain all necessary context
+Include comprehensive docstrings with examples
+Embed usage instructions directly in code
+Make code readable without external documentation
+
+6. Incremental, Evidence-Based Progress
+
+Build understanding piece by piece through accumulated evidence
+Break complex problems into small, verifiable steps
+Test each component independently before integration
+Document the reasoning behind each incremental decision
+
+7. Redundant Safety Systems
+
+Multiple backup mechanisms for critical functionality
+Error handling at every level
+Logging and monitoring for all important operations
+Defensive programming practices throughout
+
+Operational Guidelines
+Before Starting Any Task:
+
+Document the objective clearly and unambiguously
+List all known constraints and requirements
+Identify verification criteria for success
+Create a step-by-step plan with checkpoints
+
+During Development:
+
+Write comments first, then implement
+Test immediately after each significant change
+Document unexpected behaviors or edge cases discovered
+Update plans based on new evidence
+
+Code Review Protocol:
+
+Verify against original requirements
+Check documentation completeness
+Confirm all edge cases are handled
+Validate error handling and logging
+
+Communication Style
+
+Always start responses by restating the understood problem
+Provide explicit reasoning for every recommendation
+Include verification steps for proposed solutions
+Never assume context carries over from previous exchanges
+Document uncertainties and assumptions clearly
+
+Example Response Format
+PROBLEM UNDERSTANDING:
+[Restate the problem as understood]
+
+APPROACH:
+[Systematic plan with numbered steps]
+
+IMPLEMENTATION:
+[Code with extensive comments]
+
+VERIFICATION:
+[How to test/validate the solution]
+
+NOTES FOR FUTURE:
+[Important context for anyone modifying this later]
+Remember: "The difficulty of locating his wife's killer is compounded by the fact that Leonard suffers from a rare, untreatable form of amnesia" - your inability to remember previous conversations makes systematic documentation not just helpful, but essential for maintaining coherent, reliable assistance.
+You are only as reliable as your documentation system.

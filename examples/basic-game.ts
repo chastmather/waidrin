@@ -1,249 +1,184 @@
 #!/usr/bin/env tsx
 
 import { LangGraphGameEngine } from "../lib/game-engine";
-import { GameStateAnnotation, GameStateSchema } from "../lib/game-state";
+import { GameStateAnnotation } from "../lib/game-state";
 import type { GameState } from "../lib/game-state";
 
 /**
- * Basic Game Example
+ * Basic LangGraph Game Example
  * 
- * This example shows how to use the LangGraph game engine
- * for a basic Waidrin game session.
+ * This example demonstrates how to use the LangGraph game engine
+ * for creating interactive game experiences.
  */
 
-// Mock node registry for demonstration
-class MockNodeRegistry {
-  private nodes = new Map<string, any>();
+// ============================================================================
+// Example Game Nodes
+// ============================================================================
 
-  registerNode(nodeType: string, factory: any): void {
-    this.nodes.set(nodeType, factory);
-  }
-
-  createNode(nodeId: string, config: any): any {
-    const nodeType = this.getNodeTypeFromId(nodeId);
-    const factory = this.nodes.get(nodeType);
-    if (!factory) {
-      throw new Error(`Node type ${nodeType} not found`);
-    }
-    return factory(config);
-  }
-
-  getNodeTypes(): string[] {
-    return Array.from(this.nodes.keys());
-  }
-
-  hasNodeType(nodeType: string): boolean {
-    return this.nodes.has(nodeType);
-  }
-
-  private getNodeTypeFromId(nodeId: string): string {
-    const typeMap: Record<string, string> = {
-      "welcome": "welcome",
-      "connection": "connection",
-      "genre": "genre",
-      "character": "character",
-      "scenario": "scenario",
-      "chat": "chat",
-      "narration": "narration",
-      "action_generation": "action_generation",
-      "location_change": "location_change",
-      "character_introduction": "character_introduction",
-      "memory_update": "memory_update",
-      "scene_summary": "scene_summary",
-      "error_handling": "error_handling",
-      "user_input": "user_input",
-      "streaming": "streaming",
-    };
-    return typeMap[nodeId] || "unknown";
-  }
-}
-
-// Mock node implementations
-function createMockNode(nodeType: string) {
-  return {
-    nodeId: nodeType,
-    nodeType,
-    execute: async (state: GameState) => {
-      console.log(`Executing ${nodeType} node`);
-      
-      // Simulate some processing time
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Return minimal state update
+const exampleNodes = {
+  start: {
+    id: "start",
+    name: "Game Start",
+    description: "Initialize the game and welcome the player",
+    execute: async (context) => {
+      console.log("🎮 Game starting...");
       return {
-        currentNode: nodeType,
-        memory: {
-          ...state.memory,
-          conversationHistory: [
-            ...state.memory.conversationHistory,
-            {
-              role: "assistant" as const,
-              content: `Executed ${nodeType} node`,
-              timestamp: new Date().toISOString(),
-              nodeId: nodeType,
-            },
-          ],
-        },
+        success: true,
+        nextNodeId: "character_creation",
+        data: { message: "Welcome to the game!" },
+        stateUpdates: {
+          view: "character_creation",
+          gameFlow: {
+            currentPhase: "character_creation",
+            completedPhases: ["start"],
+            nextPhase: "gameplay"
+          }
+        }
       };
-    },
-    canExecute: (state: GameState) => true,
-    getNextNodes: (state: GameState) => [],
-    validateInput: (state: GameState) => true,
-  };
-}
+    }
+  },
 
-async function main() {
-  console.log("🎮 Starting Waidrin LangGraph Game Engine Example...");
+  character_creation: {
+    id: "character_creation",
+    name: "Character Creation",
+    description: "Create the player's character",
+    execute: async (context) => {
+      console.log("👤 Creating character...");
+      return {
+        success: true,
+        nextNodeId: "gameplay",
+        data: { character: "Player created" },
+        stateUpdates: {
+          view: "gameplay",
+          characters: [{
+            name: "Player",
+            gender: "unknown",
+            race: "human",
+            biography: "A brave adventurer",
+            locationIndex: 0
+          }],
+          gameFlow: {
+            currentPhase: "gameplay",
+            completedPhases: ["start", "character_creation"],
+            nextPhase: "combat"
+          }
+        }
+      };
+    }
+  },
 
-  // Create mock node registry
-  const nodeRegistry = new MockNodeRegistry();
-  
-  // Register mock nodes
-  const nodeTypes = [
-    "welcome", "connection", "genre", "character", "scenario", "chat",
-    "narration", "action_generation", "location_change", "character_introduction",
-    "memory_update", "scene_summary", "error_handling", "user_input", "streaming"
-  ];
+  gameplay: {
+    id: "gameplay",
+    name: "Main Gameplay",
+    description: "Core game loop",
+    execute: async (context) => {
+      console.log("🎯 Gameplay in progress...");
+      return {
+        success: true,
+        nextNodeId: "end",
+        data: { action: "Playing the game" },
+        stateUpdates: {
+          view: "gameplay",
+          events: [{
+            type: "narration",
+            text: "You are in a mysterious forest..."
+          }]
+        }
+      };
+    }
+  },
 
-  nodeTypes.forEach(nodeType => {
-    nodeRegistry.registerNode(nodeType, () => createMockNode(nodeType));
-  });
+  end: {
+    id: "end",
+    name: "Game End",
+    description: "End the game",
+    execute: async (context) => {
+      console.log("🏁 Game ended!");
+      return {
+        success: true,
+        data: { message: "Thanks for playing!" },
+        stateUpdates: {
+          view: "end",
+          gameFlow: {
+            currentPhase: "end",
+            completedPhases: ["start", "character_creation", "gameplay"],
+            nextPhase: null
+          }
+        }
+      };
+    }
+  }
+};
 
-  // Create game engine
-  const gameEngine = new LangGraphGameEngine(nodeRegistry);
+// ============================================================================
+// Example Usage
+// ============================================================================
 
-  // Set up event listeners
-  gameEngine.onEvent("node_started", (event) => {
-    console.log(`🚀 Node started: ${event.data.nodeId}`);
-  });
+async function runExample() {
+  console.log("🚀 Starting LangGraph Game Example\n");
 
-  gameEngine.onEvent("node_completed", (event) => {
-    console.log(`✅ Node completed: ${event.data.nodeId} (${event.data.executionTime}ms)`);
-  });
-
-  gameEngine.onEvent("node_failed", (event) => {
-    console.error(`❌ Node failed: ${event.data.nodeId} - ${event.data.error}`);
-  });
-
-  gameEngine.onEvent("game_started", (event) => {
-    console.log("🎮 Game started!");
-  });
-
-  gameEngine.onEvent("game_ended", (event) => {
-    console.log("🏁 Game ended!");
-  });
+  // Create the game engine with our example nodes
+  const engine = new LangGraphGameEngine(exampleNodes);
 
   // Create initial game state
-  const initialState: GameState = GameStateSchema.parse({
-    // Basic Waidrin state
-    apiUrl: "http://localhost:8080/v1/",
-    apiKey: "test-key",
-    model: "gpt-4",
-    contextLength: 16384,
-    inputLength: 16384,
-    generationParams: { temperature: 0.7 },
-    narrationParams: { temperature: 0.8 },
-    updateInterval: 200,
-    logPrompts: false,
-    logParams: false,
-    logResponses: false,
-    view: "welcome",
-    world: {
-      name: "Test World",
-      description: "A test world for the LangGraph engine",
-    },
-    locations: [],
-    characters: [],
-    protagonist: {
-      name: "Test Protagonist",
-      gender: "male",
-      race: "human",
-      biography: "A test character",
-      locationIndex: 0,
-    },
-    hiddenDestiny: false,
-    betrayal: false,
-    oppositeSexMagnet: false,
-    sameSexMagnet: false,
-    sexualContentLevel: "regular",
-    violentContentLevel: "regular",
-    events: [],
-    actions: [],
-
-    // LangGraph-specific state
-    currentNode: "welcome",
+  const initialState: GameState = GameStateAnnotation.State({
+    // Core LangGraph state
+    currentNode: "start",
     nodeHistory: [],
-    memory: {
-      conversationHistory: [],
-      characterRelationships: {},
-      sceneMemory: [],
-      playerPreferences: {},
-    },
+    memory: {},
     gameFlow: {
-      currentPhase: "setup",
-      canGoBack: false,
-      canSkip: false,
-      requiresUserInput: false,
+      currentPhase: "start",
+      completedPhases: [],
+      nextPhase: "character_creation"
     },
     streaming: {
       isStreaming: false,
-      currentStream: undefined,
-      streamProgress: 0,
+      streamId: null,
+      buffer: []
     },
-    plugins: {
-      activePlugins: [],
-      pluginStates: {},
-      pluginEvents: [],
-    },
+    plugins: {},
     errors: [],
     performance: {
-      nodeExecutionTimes: {},
       totalExecutionTime: 0,
-      memoryUsage: 0,
-      debugMode: true,
+      nodeExecutionTimes: {},
+      memoryUsage: 0
     },
+    
+    // Game-specific state
+    view: "start",
+    world: {
+      name: "Example World",
+      description: "A simple example world"
+    },
+    locations: [{
+      name: "Forest",
+      type: "outdoor",
+      description: "A mysterious forest"
+    }],
+    characters: [],
+    events: [],
+    currentEventIndex: 0,
+    isGenerating: false,
+    error: null,
+    isAborted: false
   });
 
   try {
-    console.log("🎯 Executing game engine...");
-    const result = await gameEngine.execute(initialState);
+    // Execute the game
+    console.log("Executing game...\n");
+    const finalState = await engine.execute(initialState);
     
-    console.log("🎉 Game execution completed!");
-    console.log("📊 Final state summary:");
-    console.log(`- Current node: ${result.currentNode}`);
-    console.log(`- Node history: ${result.nodeHistory.length} nodes executed`);
-    console.log(`- Conversation history: ${result.memory.conversationHistory.length} messages`);
-    console.log(`- Total execution time: ${result.performance.totalExecutionTime}ms`);
-    console.log(`- Errors: ${result.errors.length}`);
-
-    if (result.errors.length > 0) {
-      console.log("⚠️  Errors encountered:");
-      result.errors.forEach(error => {
-        console.log(`  - ${error.type}: ${error.message}`);
-      });
-    }
-
+    console.log("\n✅ Game completed successfully!");
+    console.log("Final state:", JSON.stringify(finalState, null, 2));
+    
   } catch (error) {
-    console.error("💥 Game execution failed:", error);
-    process.exit(1);
+    console.error("❌ Game execution failed:", error);
   }
 }
 
-// Handle graceful shutdown
-process.on("SIGINT", async () => {
-  console.log("\n🛑 Shutting down game engine...");
-  process.exit(0);
-});
-
-process.on("SIGTERM", async () => {
-  console.log("\n🛑 Shutting down game engine...");
-  process.exit(0);
-});
-
-// Run the main function
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((error) => {
-    console.error("💥 Fatal error:", error);
-    process.exit(1);
-  });
+// Run the example if this file is executed directly
+if (require.main === module) {
+  runExample().catch(console.error);
 }
+
+export { runExample };

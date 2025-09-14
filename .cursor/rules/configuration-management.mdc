@@ -1,0 +1,288 @@
+---
+description: Configuration management patterns and best practices
+---
+
+# Configuration Management
+
+## Configuration Structure
+
+### Environment-Specific Configs
+- **Development**: [config/development.json](mdc:config/development.json) - Development environment settings
+- **Production**: [config/production.json](mdc:config/production.json) - Production environment settings
+- **Main Config**: [lib/utils/config.ts](mdc:lib/utils/config.ts) - Configuration management utilities
+
+### Configuration Usage
+```typescript
+import { openaiConfig, langgraphConfig, loggingConfig } from '../lib/utils/config';
+
+// Use configuration values
+const llm = new ChatOpenAI({
+  apiKey: openaiConfig.apiKey,
+  model: openaiConfig.model,
+  temperature: openaiConfig.temperature
+});
+
+// LangGraph configuration
+const retryOptions = {
+  retries: langgraphConfig.maxRetries,
+  timeout: langgraphConfig.timeout
+};
+```
+
+## Configuration Patterns
+
+### Environment Variable Loading
+```typescript
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
+
+// Access environment variables
+const apiKey = process.env.OPENAI_API_KEY;
+const model = process.env.OPENAI_MODEL || 'gpt-4';
+```
+
+### Configuration Validation
+```typescript
+import { validateConfiguration } from '../lib/utils/config';
+
+// Validate configuration on startup
+const validateAppConfig = () => {
+  try {
+    validateConfiguration('openai', openaiConfig);
+    validateConfiguration('langgraph', langgraphConfig);
+    console.log('Configuration validation passed');
+  } catch (error) {
+    console.error('Configuration validation failed:', error.message);
+    process.exit(1);
+  }
+};
+```
+
+### Dynamic Configuration Updates
+```typescript
+export const updateConfiguration = (section: string, updates: Record<string, any>) => {
+  // Update configuration at runtime
+  const currentConfig = configurations[section];
+  const updatedConfig = { ...currentConfig, ...updates };
+  
+  // Validate updated configuration
+  validateConfiguration(section, updatedConfig);
+  
+  // Apply updates
+  configurations[section] = updatedConfig;
+  
+  logger.info('Configuration updated', { section, updates });
+};
+```
+
+### Configuration Secrets
+```typescript
+// Use environment variables for secrets
+const secretConfig = {
+  openai: {
+    apiKey: process.env.OPENAI_API_KEY || '',
+    baseURL: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1'
+  },
+  database: {
+    url: process.env.DATABASE_URL || '',
+    password: process.env.DATABASE_PASSWORD || ''
+  }
+};
+```
+
+## Configuration Best Practices
+
+### 1. Environment-Specific Settings
+```typescript
+// config/development.json
+{
+  "openai": {
+    "model": "gpt-4",
+    "temperature": 0.6,
+    "timeout": 30000
+  },
+  "logging": {
+    "level": "debug",
+    "enableConsole": true
+  }
+}
+
+// config/production.json
+{
+  "openai": {
+    "model": "gpt-4",
+    "temperature": 0.6,
+    "timeout": 30000
+  },
+  "logging": {
+    "level": "info",
+    "enableConsole": false
+  }
+}
+```
+
+### 2. Configuration Validation
+```typescript
+export const validateOpenAIConfig = (config: any) => {
+  if (!config.apiKey || typeof config.apiKey !== 'string') {
+    throw new Error('OpenAI API key is required and must be a string');
+  }
+  if (!config.model || typeof config.model !== 'string') {
+    throw new Error('OpenAI model is required and must be a string');
+  }
+  if (config.temperature < 0 || config.temperature > 2) {
+    throw new Error('OpenAI temperature must be between 0 and 2');
+  }
+};
+```
+
+### 3. Default Values
+```typescript
+export const getConfigWithDefaults = (config: any, defaults: any) => {
+  return {
+    ...defaults,
+    ...config
+  };
+};
+
+// Usage
+const openaiConfig = getConfigWithDefaults(userConfig, {
+  model: 'gpt-4',
+  temperature: 0.6,
+  timeout: 30000
+});
+```
+
+### 4. Configuration Hot Reloading
+```typescript
+import { watch } from 'fs';
+
+export const enableConfigHotReload = (configPath: string) => {
+  watch(configPath, (eventType) => {
+    if (eventType === 'change') {
+      logger.info('Configuration file changed, reloading...');
+      // Reload configuration
+      delete require.cache[require.resolve(configPath)];
+      const newConfig = require(configPath);
+      updateConfiguration('app', newConfig);
+    }
+  });
+};
+```
+
+### 5. Configuration Encryption
+```typescript
+import crypto from 'crypto';
+
+const algorithm = 'aes-256-cbc';
+const secretKey = process.env.CONFIG_SECRET_KEY || 'default-secret-key';
+
+export const encryptConfig = (text: string): string => {
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipher(algorithm, secretKey);
+  let encrypted = cipher.update(text, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  return iv.toString('hex') + ':' + encrypted;
+};
+
+export const decryptConfig = (encryptedText: string): string => {
+  const textParts = encryptedText.split(':');
+  const iv = Buffer.from(textParts.shift()!, 'hex');
+  const encryptedData = textParts.join(':');
+  const decipher = crypto.createDecipher(algorithm, secretKey);
+  let decrypted = decipher.update(encryptedData, 'hex', 'utf8');
+  decrypted += decipher.final('utf8');
+  return decrypted;
+};
+```
+
+## Environment Variables
+
+### Required Variables
+```bash
+# OpenAI Configuration
+OPENAI_API_KEY=your_api_key_here
+OPENAI_MODEL=gpt-4
+OPENAI_BASE_URL=https://api.openai.com/v1
+
+# Application Configuration
+NODE_ENV=development
+LOG_LEVEL=debug
+```
+
+### Optional Variables
+```bash
+# LangGraph Configuration
+LANGGRAPH_MAX_RETRIES=3
+LANGGRAPH_TIMEOUT=30000
+LANGGRAPH_MAX_CONCURRENCY=5
+
+# Logging Configuration
+LOG_FILE=waidrin.log
+LOG_MAX_FILE_SIZE=10m
+LOG_MAX_FILES=5
+
+# Performance Configuration
+ENABLE_PERFORMANCE_MONITORING=true
+PERFORMANCE_LOG_FILE=performance.log
+```
+
+## Configuration Testing
+
+### Configuration Validation Tests
+```typescript
+import { describe, it, expect } from 'vitest';
+import { validateConfiguration } from '../lib/utils/config';
+
+describe('Configuration Validation', () => {
+  it('should validate OpenAI configuration', () => {
+    const validConfig = {
+      apiKey: 'test-key',
+      model: 'gpt-4',
+      temperature: 0.6
+    };
+    
+    expect(() => validateConfiguration('openai', validConfig)).not.toThrow();
+  });
+
+  it('should reject invalid OpenAI configuration', () => {
+    const invalidConfig = {
+      apiKey: '',
+      model: 'gpt-4',
+      temperature: 0.6
+    };
+    
+    expect(() => validateConfiguration('openai', invalidConfig)).toThrow('API key is required');
+  });
+});
+```
+
+### Environment Variable Tests
+```typescript
+describe('Environment Variables', () => {
+  it('should load environment variables correctly', () => {
+    process.env.OPENAI_API_KEY = 'test-key';
+    process.env.OPENAI_MODEL = 'gpt-4';
+    
+    const config = loadConfiguration();
+    
+    expect(config.openai.apiKey).toBe('test-key');
+    expect(config.openai.model).toBe('gpt-4');
+  });
+});
+```
+
+## Best Practices
+
+1. **Use environment-specific configs** - separate development and production settings
+2. **Validate configuration on startup** - catch configuration errors early
+3. **Use environment variables for secrets** - never hardcode sensitive data
+4. **Provide sensible defaults** - make configuration optional where possible
+5. **Document configuration options** - explain what each setting does
+6. **Test configuration loading** - ensure configs load correctly
+7. **Use type-safe configuration** - leverage TypeScript for config types
+8. **Implement hot reloading** - for development convenience
+9. **Encrypt sensitive data** - when storing configuration files
+10. **Monitor configuration changes** - log when configs are updated

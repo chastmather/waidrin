@@ -1,0 +1,100 @@
+---
+description: Waidrin LangGraph Engine development patterns and architecture
+alwaysApply: true
+---
+
+# Waidrin LangGraph Engine
+
+## Project Overview
+
+Waidrin is a Next.js-based AI role-playing game engine with a LangGraph-powered backend. The project features a modular architecture with comprehensive state management, streaming support, and extensible game nodes.
+
+## Core Architecture
+
+### Main Entry Point
+- **Primary**: [lib/index.ts](mdc:lib/index.ts) - Main entry point with `createIntegratedGameEngine()`
+- **Core Engine**: [lib/game-engine.ts](mdc:lib/game-engine.ts) - LangGraph state machine implementation
+- **State Management**: [lib/game-state.ts](mdc:lib/game-state.ts) - Game state definitions and annotations
+
+### Key Components
+- **Backend Integration**: [lib/backend-integration.ts](mdc:lib/backend-integration.ts) - OpenAI/LLM integration
+- **State Integration**: [lib/state-integration.ts](mdc:lib/state-integration.ts) - Zustand state management
+- **Prompt Integration**: [lib/prompt-integration.ts](mdc:lib/prompt-integration.ts) - Prompt system
+- **Schema Integration**: [lib/schema-integration.ts](mdc:lib/schema-integration.ts) - Zod validation
+
+### Utility Files
+- **Logger**: [lib/utils/logger.ts](mdc:lib/utils/logger.ts) - Winston structured logging
+- **Config**: [lib/utils/config.ts](mdc:lib/utils/config.ts) - Configuration management
+- **Retry**: [lib/utils/retry.ts](mdc:lib/utils/retry.ts) - Retry logic and circuit breakers
+
+## Development Patterns
+
+### LangGraph Node Implementation
+```typescript
+import { ChatOpenAI } from "@langchain/openai";
+import { zodToJsonSchema } from "zod-to-json-schema";
+import { retryNodeExecution } from "@utils/retry";
+import { nodeLogger } from "@utils/logger";
+
+export const createGameNode = (llm: ChatOpenAI) => {
+  return async (state: GameState): Promise<Partial<GameState>> => {
+    // Node implementation with proper error handling
+    return await retryNodeExecution(async () => {
+      // Node logic here
+    }, "node_id");
+  };
+};
+```
+
+### State Management
+```typescript
+import { useStateStore } from "./state-integration";
+
+const { gameState, updateGameState } = useStateStore();
+```
+
+### Configuration Usage
+```typescript
+import { openaiConfig, langgraphConfig } from "@utils/config";
+
+const llm = new ChatOpenAI({
+  apiKey: openaiConfig.apiKey,
+  model: openaiConfig.model,
+  temperature: openaiConfig.temperature
+});
+```
+
+## File Organization
+
+```
+lib/
+├── index.ts                 # Main entry point
+├── game-engine.ts          # Core LangGraph engine
+├── game-state.ts           # State definitions
+├── node-types.ts           # Node interfaces
+├── *-integration.ts        # Integration modules
+├── *-snippets.ts          # Reference snippets
+├── utils/                  # Utility modules
+│   ├── logger.ts
+│   ├── config.ts
+│   └── retry.ts
+└── __tests__/             # Test files
+```
+
+## Key Dependencies
+
+- **@langchain/langgraph** - Core state machine
+- **@langchain/openai** - LLM integration
+- **winston** - Structured logging
+- **zod** - Runtime validation
+- **zustand** - State management
+- **vitest** - Testing framework
+
+## Development Guidelines
+
+1. **Always use structured logging** with the provided logger utilities
+2. **Implement retry logic** for all external API calls
+3. **Validate data** with Zod schemas before processing
+4. **Use configuration management** instead of hardcoded values
+5. **Write tests** for all new functionality
+6. **Follow LangGraph patterns** for node implementation

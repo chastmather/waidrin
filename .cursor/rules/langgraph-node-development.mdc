@@ -1,0 +1,173 @@
+---
+globs: lib/**/*node*.ts,lib/**/*Node*.ts
+description: LangGraph node development patterns and best practices
+---
+
+# LangGraph Node Development
+
+## Node Implementation Patterns
+
+### Basic Node Structure
+```typescript
+import { ChatOpenAI } from "@langchain/openai";
+import { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
+import { retryNodeExecution } from "@utils/retry";
+import { nodeLogger } from "@utils/logger";
+import type { GameState, NodeContext } from "../game-state";
+
+export const createGameNode = (nodeId: string, llm: ChatOpenAI) => {
+  return async (state: GameState): Promise<Partial<GameState>> => {
+    return await retryNodeExecution(async () => {
+      nodeLogger.info(`Node ${nodeId} execution started`, { state: state.currentNode });
+      
+      // Node implementation here
+      const result = await performNodeLogic(state, llm);
+      
+      nodeLogger.info(`Node ${nodeId} execution completed`);
+      return result;
+    }, nodeId);
+  };
+};
+```
+
+### Structured Output with Zod
+```typescript
+// Define schema for structured LLM output
+const NodeOutputSchema = z.object({
+  success: z.boolean(),
+  data: z.record(z.unknown()),
+  nextNodeId: z.string().optional()
+});
+
+// Convert to JSON Schema for LLM
+const jsonSchema = zodToJsonSchema(NodeOutputSchema);
+
+// Use in node implementation
+const response = await llm.invoke([
+  { role: "system", content: "You are a game master." },
+  { role: "user", content: `Generate response as JSON: ${JSON.stringify(jsonSchema)}` }
+]);
+
+const parsedOutput = NodeOutputSchema.parse(JSON.parse(response.content as string));
+```
+
+### Error Handling in Nodes
+```typescript
+export const createRobustNode = (nodeId: string, nodeFunction: (state: GameState) => Promise<Partial<GameState>>) => {
+  return async (state: GameState): Promise<Partial<GameState>> => {
+    try {
+      const result = await nodeFunction(state);
+      return result;
+    } catch (error) {
+      nodeLogger.error(`Node ${nodeId} execution failed`, { error, state });
+      
+      return {
+        errors: [...state.errors, {
+          id: `error_${Date.now()}`,
+          message: error.message,
+          nodeId,
+          timestamp: new Date().toISOString(),
+          resolved: false
+        }]
+      };
+    }
+  };
+};
+```
+
+### Streaming Node Implementation
+```typescript
+export const createStreamingNode = (llm: ChatOpenAI) => {
+  return async (state: GameState, onToken?: (token: string) => void): Promise<Partial<GameState>> => {
+    const stream = await llm.stream([
+      { role: "system", content: "You are a game master." },
+      { role: "user", content: "Continue the story..." }
+    ]);
+
+    let narration = "";
+    for await (const chunk of stream) {
+      const token = chunk.content as string;
+      narration += token;
+      onToken?.(token);
+    }
+
+    return {
+      events: [...state.events, { type: "narration", text: narration }],
+      streaming: { ...state.streaming, isStreaming: false }
+    };
+  };
+};
+```
+
+### Memory-Aware Nodes
+```typescript
+export const createMemoryNode = (llm: ChatOpenAI) => {
+  return async (state: GameState): Promise<Partial<GameState>> => {
+    // Build context from memory
+    const memoryContext = Object.entries(state.memory)
+      .map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
+      .join('\n');
+
+    const prompt = `Based on game memory:\n${memoryContext}\n\nContinue the story...`;
+
+    const response = await llm.invoke([
+      { role: "system", content: "You are a game master with access to game memory." },
+      { role: "user", content: prompt }
+    ]);
+
+    // Update memory with new information
+    const newMemory = {
+      ...state.memory,
+      lastAction: response.content,
+      timestamp: Date.now()
+    };
+
+    return {
+      memory: newMemory,
+      events: [...state.events, { type: "narration", text: response.content as string }]
+    };
+  };
+};
+```
+
+## Node Testing Patterns
+
+### Unit Testing Nodes
+```typescript
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { createGameNode } from '../lib/nodes/game-node';
+
+describe('Game Node', () => {
+  let mockLLM: any;
+  let gameNode: (state: GameState) => Promise<Partial<GameState>>;
+
+  beforeEach(() => {
+    mockLLM = {
+      invoke: vi.fn().mockResolvedValue({
+        content: JSON.stringify({ success: true, data: {} })
+      })
+    };
+    gameNode = createGameNode("test_node", mockLLM);
+  });
+
+  it('should execute successfully', async () => {
+    const state: GameState = { /* test state */ };
+    const result = await gameNode(state);
+    expect(result).toBeDefined();
+  });
+});
+```
+
+## Best Practices
+
+1. **Always use retry logic** with `retryNodeExecution`
+2. **Log node execution** with structured logging
+3. **Validate inputs and outputs** with Zod schemas
+4. **Handle errors gracefully** and return partial state updates
+5. **Use streaming** for long-running operations
+6. **Update memory** when appropriate
+7. **Write tests** for all node functionality
+8. **Keep nodes focused** on single responsibilities
+9. **Use configuration** for node-specific settings
+10. **Monitor performance** with timing logs

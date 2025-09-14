@@ -1,0 +1,291 @@
+---
+globs: **/*.test.ts,**/*.spec.ts,**/__tests__/**
+description: Testing patterns and best practices for Waidrin LangGraph engine
+---
+
+# Testing Patterns for Waidrin LangGraph Engine
+
+## Test Configuration
+
+### Vitest Setup
+- **Config**: [vitest.config.ts](mdc:vitest.config.ts) - Vitest configuration with path aliases
+- **Scripts**: Use `npm run test`, `npm run test:ui`, `npm run test:coverage`
+
+### Test File Organization
+```
+lib/
+├── __tests__/
+│   ├── setup.ts              # Test setup and mocks
+│   ├── game-engine.test.ts   # Engine integration tests
+│   ├── nodes.test.ts         # Node unit tests
+│   └── integration.test.ts   # End-to-end tests
+```
+
+## Testing Patterns
+
+### Unit Testing LangGraph Nodes
+```typescript
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { createCharacterNode } from '../lib/nodes/character-node';
+import type { GameState } from '../lib/game-state';
+
+describe('Character Node', () => {
+  let mockLLM: any;
+  let characterNode: (state: GameState) => Promise<Partial<GameState>>;
+
+  beforeEach(() => {
+    mockLLM = {
+      invoke: vi.fn().mockResolvedValue({
+        content: JSON.stringify({
+          name: "Test Character",
+          race: "human",
+          gender: "male",
+          biography: "A test character"
+        })
+      })
+    };
+    characterNode = createCharacterNode(mockLLM);
+  });
+
+  it('should create a character successfully', async () => {
+    const state: GameState = {
+      // ... initial state
+    };
+
+    const result = await characterNode(state);
+
+    expect(result.characters).toHaveLength(1);
+    expect(result.characters[0].name).toBe("Test Character");
+    expect(mockLLM.invoke).toHaveBeenCalledTimes(1);
+  });
+
+  it('should handle LLM errors gracefully', async () => {
+    mockLLM.invoke.mockRejectedValue(new Error('LLM API error'));
+    
+    const state: GameState = { /* test state */ };
+    
+    await expect(characterNode(state)).rejects.toThrow('LLM API error');
+  });
+});
+```
+
+### Integration Testing Game Engine
+```typescript
+import { describe, it, expect, beforeEach } from 'vitest';
+import { LangGraphGameEngine } from '../lib/game-engine';
+import { createMockNodeRegistry } from './mocks/node-registry';
+
+describe('Game Engine Integration', () => {
+  let engine: LangGraphGameEngine;
+  let mockNodeRegistry: any;
+
+  beforeEach(() => {
+    mockNodeRegistry = createMockNodeRegistry();
+    engine = new LangGraphGameEngine(mockNodeRegistry);
+  });
+
+  it('should execute complete game flow', async () => {
+    const initialState = createMockInitialState();
+    
+    const result = await engine.execute(initialState);
+    
+    expect(result.gameFlow.completedPhases).toContain("world_creation");
+    expect(result.gameFlow.completedPhases).toContain("character_creation");
+    expect(result.currentNode).toBe("end");
+  });
+
+  it('should handle node execution errors', async () => {
+    const initialState = createMockInitialState();
+    mockNodeRegistry.world_creation.execute.mockRejectedValue(new Error('Node error'));
+    
+    const result = await engine.execute(initialState);
+    
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0].message).toBe('Node error');
+  });
+});
+```
+
+### Mocking External Dependencies
+```typescript
+// lib/__tests__/mocks/llm.ts
+export const createMockLLM = () => ({
+  invoke: vi.fn(),
+  stream: vi.fn(),
+  bind: vi.fn()
+});
+
+// lib/__tests__/mocks/node-registry.ts
+export const createMockNodeRegistry = () => ({
+  world_creation: {
+    id: "world_creation",
+    name: "World Creation",
+    execute: vi.fn()
+  },
+  character_creation: {
+    id: "character_creation", 
+    name: "Character Creation",
+    execute: vi.fn()
+  }
+});
+
+// lib/__tests__/mocks/state.ts
+export const createMockInitialState = (): GameState => ({
+  currentNode: "start",
+  nodeHistory: [],
+  memory: {},
+  gameFlow: {
+    currentPhase: "start",
+    completedPhases: [],
+    nextPhase: "world_creation"
+  },
+  streaming: {
+    isStreaming: false,
+    streamId: null,
+    buffer: []
+  },
+  plugins: {},
+  errors: [],
+  performance: {
+    totalExecutionTime: 0,
+    nodeExecutionTimes: {},
+    memoryUsage: 0
+  },
+  view: "welcome",
+  world: { name: "[name]", description: "[description]" },
+  locations: [],
+  characters: [],
+  events: [],
+  currentEventIndex: 0,
+  isGenerating: false,
+  error: null,
+  isAborted: false
+});
+```
+
+### Testing Async Operations
+```typescript
+import { describe, it, expect, vi } from 'vitest';
+import { retryApiCall } from '../lib/utils/retry';
+
+describe('Retry Logic', () => {
+  it('should retry failed API calls', async () => {
+    const mockApiCall = vi.fn()
+      .mockRejectedValueOnce(new Error('Network error'))
+      .mockRejectedValueOnce(new Error('Network error'))
+      .mockResolvedValue('success');
+
+    const result = await retryApiCall(mockApiCall, 'test API call');
+    
+    expect(result).toBe('success');
+    expect(mockApiCall).toHaveBeenCalledTimes(3);
+  });
+
+  it('should fail after max retries', async () => {
+    const mockApiCall = vi.fn().mockRejectedValue(new Error('Persistent error'));
+    
+    await expect(retryApiCall(mockApiCall, 'test API call')).rejects.toThrow('Persistent error');
+    expect(mockApiCall).toHaveBeenCalledTimes(3);
+  });
+});
+```
+
+### Testing State Management
+```typescript
+import { describe, it, expect } from 'vitest';
+import { useStateStore } from '../lib/state-integration';
+
+describe('State Management', () => {
+  it('should update game state correctly', async () => {
+    const { gameState, updateGameState } = useStateStore.getState();
+    
+    await updateGameState({
+      currentNode: "test_node",
+      gameFlow: {
+        currentPhase: "test",
+        completedPhases: ["start"],
+        nextPhase: "end"
+      }
+    });
+    
+    expect(gameState.currentNode).toBe("test_node");
+    expect(gameState.gameFlow.currentPhase).toBe("test");
+  });
+});
+```
+
+### Testing Configuration
+```typescript
+import { describe, it, expect } from 'vitest';
+import { openaiConfig, langgraphConfig } from '../lib/utils/config';
+
+describe('Configuration', () => {
+  it('should load OpenAI configuration', () => {
+    expect(openaiConfig.model).toBeDefined();
+    expect(openaiConfig.temperature).toBeDefined();
+  });
+
+  it('should load LangGraph configuration', () => {
+    expect(langgraphConfig.maxRetries).toBeDefined();
+    expect(langgraphConfig.timeout).toBeDefined();
+  });
+});
+```
+
+## Test Utilities
+
+### Custom Matchers
+```typescript
+// lib/__tests__/matchers.ts
+import { expect } from 'vitest';
+
+expect.extend({
+  toBeValidGameState(received: any) {
+    const hasRequiredFields = received.currentNode && received.gameFlow && received.view;
+    return {
+      pass: hasRequiredFields,
+      message: () => `Expected ${received} to be a valid game state`
+    };
+  }
+});
+```
+
+### Test Helpers
+```typescript
+// lib/__tests__/helpers.ts
+export const waitForStateChange = (stateStore: any, expectedState: Partial<GameState>, timeout = 5000) => {
+  return new Promise((resolve, reject) => {
+    const startTime = Date.now();
+    
+    const checkState = () => {
+      const currentState = stateStore.getState().gameState;
+      const matches = Object.entries(expectedState).every(([key, value]) => 
+        currentState[key] === value
+      );
+      
+      if (matches) {
+        resolve(currentState);
+      } else if (Date.now() - startTime > timeout) {
+        reject(new Error('State change timeout'));
+      } else {
+        setTimeout(checkState, 100);
+      }
+    };
+    
+    checkState();
+  });
+};
+```
+
+## Best Practices
+
+1. **Mock external dependencies** (LLM, APIs, file system)
+2. **Test error scenarios** as well as success cases
+3. **Use descriptive test names** that explain the expected behavior
+4. **Group related tests** with `describe` blocks
+5. **Clean up after tests** with `beforeEach`/`afterEach`
+6. **Test async operations** properly with `await`
+7. **Verify mock calls** to ensure correct interactions
+8. **Test edge cases** and error conditions
+9. **Use test utilities** for common patterns
+10. **Maintain test coverage** above 80%

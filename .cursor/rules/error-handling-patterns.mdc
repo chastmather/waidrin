@@ -1,0 +1,269 @@
+---
+description: Error handling patterns and best practices for Waidrin LangGraph engine
+alwaysApply: true
+---
+
+# Error Handling Patterns
+
+## Error Classification
+
+### Retryable Errors
+```typescript
+import { isRetryableError } from '../lib/utils/retry';
+
+// Network errors
+if (error.code === 'ECONNRESET' || error.code === 'ENOTFOUND') {
+  return true;
+}
+
+// HTTP 5xx errors
+if (error.status >= 500 && error.status < 600) {
+  return true;
+}
+
+// Rate limiting
+if (error.status === 429) {
+  return true;
+}
+
+// OpenAI specific errors
+if (error.type === 'insufficient_quota' || error.type === 'rate_limit_exceeded') {
+  return true;
+}
+```
+
+### Non-Retryable Errors
+```typescript
+// Authentication errors
+if (error.status === 401 || error.status === 403) {
+  return false;
+}
+
+// Validation errors
+if (error.status === 400) {
+  return false;
+}
+
+// Abort errors
+if (error.name === 'AbortError') {
+  return false;
+}
+```
+
+## Error Handling Patterns
+
+### LangGraph Node Error Handling
+```typescript
+import { retryNodeExecution } from '../lib/utils/retry';
+import { nodeLogger } from '../lib/utils/logger';
+
+export const createRobustNode = (nodeId: string, nodeFunction: (state: GameState) => Promise<Partial<GameState>>) => {
+  return async (state: GameState): Promise<Partial<GameState>> => {
+    try {
+      return await retryNodeExecution(nodeFunction, nodeId);
+    } catch (error) {
+      nodeLogger.error(`Node ${nodeId} execution failed`, { error, state });
+      
+      return {
+        errors: [...state.errors, {
+          id: `error_${Date.now()}`,
+          message: error.message,
+          nodeId,
+          timestamp: new Date().toISOString(),
+          resolved: false
+        }],
+        error: error.message
+      };
+    }
+  };
+};
+```
+
+### API Call Error Handling
+```typescript
+import { retryApiCall } from '../lib/utils/retry';
+import { apiLogger } from '../lib/utils/logger';
+
+export const callLLMWithErrorHandling = async (prompt: string, context: string) => {
+  try {
+    return await retryApiCall(async () => {
+      const response = await llm.invoke([{ role: "user", content: prompt }]);
+      return response.content;
+    }, context);
+  } catch (error) {
+    apiLogger.error('LLM API call failed', { error, context });
+    throw new Error(`LLM call failed: ${error.message}`);
+  }
+};
+```
+
+### State Update Error Handling
+```typescript
+import { useStateStore } from '../lib/state-integration';
+import { stateLogger } from '../lib/utils/logger';
+
+export const safeStateUpdate = async (updates: Partial<GameState>) => {
+  try {
+    const { updateGameState } = useStateStore.getState();
+    await updateGameState(updates);
+  } catch (error) {
+    stateLogger.error('State update failed', { error, updates });
+    
+    // Add error to state
+    const { updateGameState } = useStateStore.getState();
+    await updateGameState({
+      errors: [{
+        id: `state_error_${Date.now()}`,
+        message: error.message,
+        nodeId: 'state_manager',
+        timestamp: new Date().toISOString(),
+        resolved: false
+      }]
+    });
+  }
+};
+```
+
+### Circuit Breaker Pattern
+```typescript
+import { CircuitBreaker } from '../lib/utils/retry';
+
+const apiCircuitBreaker = new CircuitBreaker(5, 60000, 30000);
+
+export const callWithCircuitBreaker = async (apiCall: () => Promise<any>) => {
+  try {
+    return await apiCircuitBreaker.execute(apiCall);
+  } catch (error) {
+    if (apiCircuitBreaker.getState() === 'OPEN') {
+      throw new Error('Service temporarily unavailable (circuit breaker open)');
+    }
+    throw error;
+  }
+};
+```
+
+## Error Recovery Strategies
+
+### Graceful Degradation
+```typescript
+export const createFallbackNode = (primaryNode: (state: GameState) => Promise<Partial<GameState>>, fallbackNode: (state: GameState) => Promise<Partial<GameState>>) => {
+  return async (state: GameState): Promise<Partial<GameState>> => {
+    try {
+      return await primaryNode(state);
+    } catch (error) {
+      nodeLogger.warn('Primary node failed, using fallback', { error });
+      return await fallbackNode(state);
+    }
+  };
+};
+```
+
+### Error State Management
+```typescript
+export const handleNodeError = (nodeId: string, error: Error, state: GameState): Partial<GameState> => {
+  const errorEntry = {
+    id: `error_${Date.now()}`,
+    message: error.message,
+    nodeId,
+    timestamp: new Date().toISOString(),
+    resolved: false
+  };
+
+  return {
+    errors: [...state.errors, errorEntry],
+    error: error.message,
+    isGenerating: false
+  };
+};
+```
+
+### Retry with Exponential Backoff
+```typescript
+import pRetry from 'p-retry';
+
+export const retryWithBackoff = async <T>(
+  fn: () => Promise<T>,
+  context: string,
+  options: { retries?: number; factor?: number } = {}
+) => {
+  return pRetry(fn, {
+    retries: options.retries || 3,
+    factor: options.factor || 2,
+    minTimeout: 1000,
+    maxTimeout: 10000,
+    onFailedAttempt: (error) => {
+      nodeLogger.warn(`${context} attempt failed`, {
+        attempt: error.attemptNumber,
+        retriesLeft: error.retriesLeft,
+        error: error.message
+      });
+    }
+  });
+};
+```
+
+## Error Monitoring and Logging
+
+### Structured Error Logging
+```typescript
+import { logger } from '../lib/utils/logger';
+
+export const logError = (error: Error, context: Record<string, any> = {}) => {
+  logger.error('Application error', {
+    message: error.message,
+    stack: error.stack,
+    name: error.name,
+    context,
+    timestamp: new Date().toISOString()
+  });
+};
+```
+
+### Error Metrics
+```typescript
+export const trackError = (errorType: string, nodeId: string, duration: number) => {
+  // Track error metrics for monitoring
+  logger.info('Error metrics', {
+    errorType,
+    nodeId,
+    duration,
+    timestamp: new Date().toISOString()
+  });
+};
+```
+
+### Error Recovery Actions
+```typescript
+export const attemptErrorRecovery = async (error: Error, state: GameState): Promise<Partial<GameState> | null> => {
+  // Attempt to recover from specific error types
+  if (error.message.includes('rate limit')) {
+    // Wait and retry
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    return null; // Retry the operation
+  }
+  
+  if (error.message.includes('invalid state')) {
+    // Reset to a known good state
+    return {
+      currentNode: 'start',
+      error: null,
+      isGenerating: false
+    };
+  }
+  
+  return null; // No recovery possible
+};
+```
+
+## Best Practices
+
+1. **Always handle errors gracefully** - never let unhandled errors crash the application
+2. **Use structured logging** - include context and error details
+3. **Implement retry logic** - for transient errors
+4. **Use circuit breakers** - for failing services
+5. **Provide fallback mechanisms** - when primary operations fail
+6. **Monitor error rates** - track and alert on error patterns
+7. **Test error scenarios** - ensure error handling works correctly
+8. **Document error conditions** - make error handling predictable
+9. **Use appropriate error types** - distinguish between different error categories
+10. **Implement error recovery** - when possible, automatically recover from errors

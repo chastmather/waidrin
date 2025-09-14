@@ -1,0 +1,314 @@
+---
+description: Performance monitoring and optimization patterns for Waidrin LangGraph engine
+---
+
+# Performance Monitoring
+
+## Performance Tracking
+
+### Node Execution Monitoring
+```typescript
+import { performanceLogger } from '../lib/utils/logger';
+
+export const createPerformanceMonitoredNode = (nodeId: string, nodeFunction: (state: GameState) => Promise<Partial<GameState>>) => {
+  return async (state: GameState): Promise<Partial<GameState>> => {
+    const startTime = performance.now();
+    const startMemory = process.memoryUsage();
+
+    try {
+      const result = await nodeFunction(state);
+      
+      const endTime = performance.now();
+      const endMemory = process.memoryUsage();
+      
+      performanceLogger.info("Node performance", {
+        nodeId,
+        executionTime: endTime - startTime,
+        memoryDelta: endMemory.heapUsed - startMemory.heapUsed,
+        memoryUsage: endMemory.heapUsed,
+        timestamp: new Date().toISOString()
+      });
+
+      return {
+        ...result,
+        performance: {
+          ...state.performance,
+          nodeExecutionTimes: {
+            ...state.performance.nodeExecutionTimes,
+            [nodeId]: endTime - startTime
+          },
+          totalExecutionTime: state.performance.totalExecutionTime + (endTime - startTime),
+          memoryUsage: endMemory.heapUsed
+        }
+      };
+    } catch (error) {
+      const endTime = performance.now();
+      performanceLogger.error("Node performance error", {
+        nodeId,
+        executionTime: endTime - startTime,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+      throw error;
+    }
+  };
+};
+```
+
+### API Call Performance
+```typescript
+import { apiLogger } from '../lib/utils/logger';
+
+export const trackApiCall = async <T>(
+  apiCall: () => Promise<T>,
+  endpoint: string,
+  method: string
+): Promise<T> => {
+  const startTime = performance.now();
+  
+  try {
+    const result = await apiCall();
+    const duration = performance.now() - startTime;
+    
+    apiLogger.info('API call completed', {
+      endpoint,
+      method,
+      duration,
+      timestamp: new Date().toISOString()
+    });
+    
+    return result;
+  } catch (error) {
+    const duration = performance.now() - startTime;
+    
+    apiLogger.error('API call failed', {
+      endpoint,
+      method,
+      duration,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+    
+    throw error;
+  }
+};
+```
+
+### Memory Usage Monitoring
+```typescript
+export const monitorMemoryUsage = () => {
+  const memoryUsage = process.memoryUsage();
+  
+  performanceLogger.info('Memory usage', {
+    rss: memoryUsage.rss,
+    heapTotal: memoryUsage.heapTotal,
+    heapUsed: memoryUsage.heapUsed,
+    external: memoryUsage.external,
+    arrayBuffers: memoryUsage.arrayBuffers,
+    timestamp: new Date().toISOString()
+  });
+  
+  // Alert if memory usage is high
+  if (memoryUsage.heapUsed > 100 * 1024 * 1024) { // 100MB
+    performanceLogger.warn('High memory usage detected', {
+      heapUsed: memoryUsage.heapUsed,
+      threshold: 100 * 1024 * 1024
+    });
+  }
+};
+```
+
+## Performance Optimization
+
+### Caching Strategies
+```typescript
+import { cacheConfig } from '../lib/utils/config';
+
+class NodeCache {
+  private cache = new Map<string, { data: any; timestamp: number; ttl: number }>();
+
+  set(key: string, data: any, ttl: number = cacheConfig.ttl * 1000) {
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now(),
+      ttl
+    });
+  }
+
+  get(key: string): any | null {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+    
+    if (Date.now() - entry.timestamp > entry.ttl) {
+      this.cache.delete(key);
+      return null;
+    }
+    
+    return entry.data;
+  }
+
+  clear() {
+    this.cache.clear();
+  }
+}
+
+export const nodeCache = new NodeCache();
+```
+
+### Rate Limiting
+```typescript
+import pLimit from 'p-limit';
+import { langgraphConfig } from '../lib/utils/config';
+
+const apiLimit = pLimit(langgraphConfig.maxConcurrency);
+
+export const rateLimitedApiCall = <T>(apiCall: () => Promise<T>): Promise<T> => {
+  return apiLimit(apiCall);
+};
+```
+
+### Batch Processing
+```typescript
+export const batchProcessNodes = async (
+  nodes: Array<{ id: string; execute: (state: GameState) => Promise<Partial<GameState>> }>,
+  state: GameState
+): Promise<Partial<GameState>> => {
+  const startTime = performance.now();
+  
+  // Process nodes in parallel where possible
+  const results = await Promise.all(
+    nodes.map(node => 
+      createPerformanceMonitoredNode(node.id, node.execute)(state)
+    )
+  );
+  
+  const endTime = performance.now();
+  
+  performanceLogger.info('Batch processing completed', {
+    nodeCount: nodes.length,
+    totalTime: endTime - startTime,
+    averageTime: (endTime - startTime) / nodes.length
+  });
+  
+  // Merge results
+  return results.reduce((acc, result) => ({ ...acc, ...result }), {});
+};
+```
+
+### Lazy Loading
+```typescript
+export const createLazyNode = (nodeId: string, loader: () => Promise<(state: GameState) => Promise<Partial<GameState>>>) => {
+  let nodeFunction: ((state: GameState) => Promise<Partial<GameState>>) | null = null;
+  
+  return async (state: GameState): Promise<Partial<GameState>> => {
+    if (!nodeFunction) {
+      performanceLogger.info(`Loading node ${nodeId}`, { nodeId });
+      nodeFunction = await loader();
+    }
+    
+    return nodeFunction(state);
+  };
+};
+```
+
+## Performance Metrics
+
+### Metrics Collection
+```typescript
+export class PerformanceMetrics {
+  private metrics = new Map<string, number[]>();
+  
+  record(metric: string, value: number) {
+    if (!this.metrics.has(metric)) {
+      this.metrics.set(metric, []);
+    }
+    this.metrics.get(metric)!.push(value);
+  }
+  
+  getAverage(metric: string): number {
+    const values = this.metrics.get(metric) || [];
+    return values.reduce((sum, val) => sum + val, 0) / values.length;
+  }
+  
+  getPercentile(metric: string, percentile: number): number {
+    const values = this.metrics.get(metric) || [];
+    const sorted = values.sort((a, b) => a - b);
+    const index = Math.ceil((percentile / 100) * sorted.length) - 1;
+    return sorted[index] || 0;
+  }
+  
+  getStats(metric: string) {
+    const values = this.metrics.get(metric) || [];
+    return {
+      count: values.length,
+      average: this.getAverage(metric),
+      p50: this.getPercentile(metric, 50),
+      p95: this.getPercentile(metric, 95),
+      p99: this.getPercentile(metric, 99),
+      min: Math.min(...values),
+      max: Math.max(...values)
+    };
+  }
+}
+
+export const performanceMetrics = new PerformanceMetrics();
+```
+
+### Performance Alerts
+```typescript
+export const checkPerformanceThresholds = (nodeId: string, executionTime: number) => {
+  const thresholds = {
+    warning: 5000,  // 5 seconds
+    critical: 10000 // 10 seconds
+  };
+  
+  if (executionTime > thresholds.critical) {
+    performanceLogger.error('Critical performance threshold exceeded', {
+      nodeId,
+      executionTime,
+      threshold: thresholds.critical
+    });
+  } else if (executionTime > thresholds.warning) {
+    performanceLogger.warn('Performance warning threshold exceeded', {
+      nodeId,
+      executionTime,
+      threshold: thresholds.warning
+    });
+  }
+};
+```
+
+## Monitoring Dashboard
+
+### Performance Summary
+```typescript
+export const getPerformanceSummary = () => {
+  const nodeTimes = performanceMetrics.getStats('node_execution_time');
+  const apiTimes = performanceMetrics.getStats('api_call_time');
+  const memoryUsage = process.memoryUsage();
+  
+  return {
+    nodes: nodeTimes,
+    api: apiTimes,
+    memory: {
+      heapUsed: memoryUsage.heapUsed,
+      heapTotal: memoryUsage.heapTotal,
+      rss: memoryUsage.rss
+    },
+    timestamp: new Date().toISOString()
+  };
+};
+```
+
+## Best Practices
+
+1. **Monitor all critical paths** - track performance of important operations
+2. **Set appropriate thresholds** - define warning and critical performance levels
+3. **Use caching strategically** - cache expensive operations when possible
+4. **Implement rate limiting** - prevent overwhelming external services
+5. **Batch operations** - group related operations to reduce overhead
+6. **Use lazy loading** - load resources only when needed
+7. **Monitor memory usage** - prevent memory leaks and excessive usage
+8. **Collect metrics** - track performance trends over time
+9. **Set up alerts** - get notified when performance degrades
+10. **Profile regularly** - identify performance bottlenecks

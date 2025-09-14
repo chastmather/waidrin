@@ -1,8 +1,8 @@
 #!/usr/bin/env tsx
 
-import { LangGraphGameEngine } from "../core/game-engine";
-import { GameStateAnnotation } from "../types/game-state";
-import type { GameState } from "../types/game-state";
+import { LangGraphGameEngine } from "../lib/game-engine";
+import { GameStateAnnotation, GameStateSchema } from "../lib/game-state";
+import type { GameState } from "../lib/game-state";
 
 /**
  * Basic Game Example

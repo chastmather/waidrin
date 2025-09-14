@@ -1,7 +1,7 @@
 import { StateGraph, END } from "@langchain/langgraph";
-import type { GameState, GameEvent, NodeContext } from "../types/game-state";
-import type { GameNode, NodeRegistry, NodeExecutionResult } from "../types/node-types";
-import { GameStateAnnotation } from "../types/game-state";
+import type { GameState, GameEvent, NodeContext } from "./game-state";
+import type { GameNode, NodeRegistry, NodeExecutionResult } from "./node-types";
+import { GameStateAnnotation } from "./game-state";
 
 /**
  * ⚠️  UNCONFIRMED CHANGES ⚠️

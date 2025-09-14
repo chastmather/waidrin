@@ -1,0 +1,729 @@
+---
+description: # LangGraph Development Patterns
+alwaysApply: false
+---
+# LangGraph Development Patterns
+
+## Core LangGraph Integration
+
+### StateGraph Construction
+```typescript
+import { StateGraph, END } from "@langchain/langgraph";
+import { ChatOpenAI } from "@langchain/openai";
+import { GameStateAnnotation } from "./game-state";
+
+// Create LangGraph state machine
+const graph = new StateGraph<GameState>(GameStateAnnotation);
+
+// Add nodes with proper error handling
+graph.addNode("world_creation", async (state: GameState) => {
+  try {
+    // Node implementation with retry logic
+    const result = await callWithRetry(() => createWorld(state));
+    return { ...state, world: result };
+  } catch (error) {
+    logger.error("World creation failed", { error, state });
+    throw error;
+  }
+});
+
+// Add conditional edges
+graph.addConditionalEdges(
+  "world_creation",
+  (state: GameState) => state.gameFlow.nextPhase || "character_creation",
+  {
+    "character_creation": "character_creation",
+    "end": END
+  }
+);
+
+// Compile the graph
+const compiledGraph = graph.compile();
+```
+
+### Node Implementation Patterns
+```typescript
+import { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
+import pRetry from "p-retry";
+
+// Define Zod schema for structured output
+const CharacterSchema = z.object({
+  name: z.string().min(1).max(100),
+  race: z.enum(["human", "elf", "dwarf"]),
+  gender: z.enum(["male", "female"]),
+  biography: z.string().max(500)
+});
+
+// Convert to JSON Schema for LLM
+const characterJsonSchema = zodToJsonSchema(CharacterSchema);
+
+// Node implementation with proper error handling
+export const createCharacterNode = (llm: ChatOpenAI) => {
+  return async (state: GameState): Promise<Partial<GameState>> => {
+    const prompt = `Create a character for the world: ${state.world.name}`;
+    
+    try {
+      const response = await pRetry(
+        () => llm.invoke([
+          { role: "system", content: "You are a game master creating characters." },
+          { role: "user", content: `${prompt}\n\nReturn as JSON matching this schema: ${JSON.stringify(characterJsonSchema)}` }
+        ]),
+        {
+          retries: 3,
+          factor: 2,
+          minTimeout: 1000,
+          onFailedAttempt: (error) => {
+            logger.warn("Character creation attempt failed", { 
+              attempt: error.attemptNumber, 
+              error: error.message 
+            });
+          }
+        }
+      );
+
+      const character = CharacterSchema.parse(JSON.parse(response.content as string));
+      
+      logger.info("Character created successfully", { character: character.name });
+      
+      return {
+        characters: [...state.characters, character],
+        gameFlow: {
+          ...state.gameFlow,
+          currentPhase: "character_creation",
+          completedPhases: [...state.gameFlow.completedPhases, "world_creation"]
+        }
+      };
+    } catch (error) {
+      logger.error("Character creation failed", { error, state });
+      throw new Error(`Character creation failed: ${error.message}`);
+    }
+  };
+};
+```
+
+### Streaming Integration
+```typescript
+import { ChatOpenAI } from "@langchain/openai";
+
+// Streaming node implementation
+export const createStreamingNode = (llm: ChatOpenAI) => {
+  return async (state: GameState, onToken?: (token: string) => void): Promise<Partial<GameState>> => {
+    const stream = await llm.stream([
+      { role: "system", content: "You are a game master." },
+      { role: "user", content: "Continue the story..." }
+    ]);
+
+    let narration = "";
+    for await (const chunk of stream) {
+      const token = chunk.content as string;
+      narration += token;
+      onToken?.(token);
+    }
+
+    return {
+      events: [...state.events, { type: "narration", text: narration }],
+      streaming: { ...state.streaming, isStreaming: false }
+    };
+  };
+};
+```
+
+### Error Handling Patterns
+```typescript
+import { isAbortError } from "./utils/error-handling";
+
+export const createRobustNode = (nodeId: string, nodeFunction: (state: GameState) => Promise<Partial<GameState>>) => {
+  return async (state: GameState): Promise<Partial<GameState>> => {
+    const startTime = Date.now();
+    
+    try {
+      logger.info(`Node ${nodeId} execution started`, { state: state.currentNode });
+      
+      const result = await pRetry(
+        () => nodeFunction(state),
+        {
+          retries: 3,
+          factor: 2,
+          minTimeout: 1000,
+          onFailedAttempt: (error) => {
+            if (isAbortError(error)) {
+              throw error; // Don't retry abort errors
+            }
+            logger.warn(`Node ${nodeId} attempt failed`, { 
+              attempt: error.attemptNumber, 
+              error: error.message 
+            });
+          }
+        }
+      );
+
+      const duration = Date.now() - startTime;
+      logger.info(`Node ${nodeId} execution completed`, { duration });
+
+      return {
+        ...result,
+        performance: {
+          ...state.performance,
+          nodeExecutionTimes: {
+            ...state.performance.nodeExecutionTimes,
+            [nodeId]: duration
+          }
+        }
+      };
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(`Node ${nodeId} execution failed`, { error, duration });
+
+      return {
+        errors: [...state.errors, {
+          id: `error_${Date.now()}`,
+          message: error.message,
+          nodeId,
+          timestamp: new Date().toISOString(),
+          resolved: false
+        }],
+        performance: {
+          ...state.performance,
+          nodeExecutionTimes: {
+            ...state.performance.nodeExecutionTimes,
+            [nodeId]: duration
+          }
+        }
+      };
+    }
+  };
+};
+```
+
+### Memory Management
+```typescript
+// Memory-aware node implementation
+export const createMemoryNode = (llm: ChatOpenAI) => {
+  return async (state: GameState): Promise<Partial<GameState>> => {
+    // Build context from memory
+    const memoryContext = Object.entries(state.memory)
+      .map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
+      .join('\n');
+
+    const prompt = `Based on the game memory:\n${memoryContext}\n\nContinue the story...`;
+
+    const response = await llm.invoke([
+      { role: "system", content: "You are a game master with access to game memory." },
+      { role: "user", content: prompt }
+    ]);
+
+    // Update memory with new information
+    const newMemory = {
+      ...state.memory,
+      lastAction: response.content,
+      timestamp: Date.now()
+    };
+
+    return {
+      memory: newMemory,
+      events: [...state.events, { type: "narration", text: response.content as string }]
+    };
+  };
+};
+```
+
+### Performance Monitoring
+```typescript
+import winston from "winston";
+
+const performanceLogger = winston.createLogger({
+  level: 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  transports: [
+    new winston.transports.File({ filename: 'performance.log' })
+  ]
+});
+
+export const createPerformanceMonitoredNode = (nodeId: string, nodeFunction: (state: GameState) => Promise<Partial<GameState>>) => {
+  return async (state: GameState): Promise<Partial<GameState>> => {
+    const startTime = performance.now();
+    const startMemory = process.memoryUsage();
+
+    try {
+      const result = await nodeFunction(state);
+      
+      const endTime = performance.now();
+      const endMemory = process.memoryUsage();
+      
+      performanceLogger.info("Node performance", {
+        nodeId,
+        executionTime: endTime - startTime,
+        memoryDelta: endMemory.heapUsed - startMemory.heapUsed,
+        timestamp: new Date().toISOString()
+      });
+
+      return result;
+    } catch (error) {
+      const endTime = performance.now();
+      performanceLogger.error("Node performance error", {
+        nodeId,
+        executionTime: endTime - startTime,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+      throw error;
+    }
+  };
+};
+```
+
+## Testing Patterns
+
+### Unit Testing Nodes
+```typescript
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { createCharacterNode } from '../lib/nodes/character-node';
+
+describe('Character Node', () => {
+  let mockLLM: any;
+  let characterNode: (state: GameState) => Promise<Partial<GameState>>;
+
+  beforeEach(() => {
+    mockLLM = {
+      invoke: vi.fn().mockResolvedValue({
+        content: JSON.stringify({
+          name: "Test Character",
+          race: "human",
+          gender: "male",
+          biography: "A test character"
+        })
+      })
+    };
+    characterNode = createCharacterNode(mockLLM);
+  });
+
+  it('should create a character successfully', async () => {
+    const state: GameState = {
+      // ... initial state
+    };
+
+    const result = await characterNode(state);
+
+    expect(result.characters).toHaveLength(1);
+    expect(result.characters[0].name).toBe("Test Character");
+  });
+});
+```
+
+### Integration Testing
+```typescript
+import { describe, it, expect } from 'vitest';
+import { LangGraphGameEngine } from '../lib/game-engine';
+
+describe('Game Engine Integration', () => {
+  it('should execute complete game flow', async () => {
+    const engine = new LangGraphGameEngine(mockNodeRegistry);
+    const initialState = createMockInitialState();
+
+    const result = await engine.execute(initialState);
+
+    expect(result.gameFlow.completedPhases).toContain("world_creation");
+    expect(result.gameFlow.completedPhases).toContain("character_creation");
+  });
+});
+```
+
+## Configuration Management
+
+### Environment Configuration
+```typescript
+import config from "config";
+
+export const langgraphConfig = {
+  maxRetries: config.get<number>('langgraph.maxRetries', 3),
+  timeout: config.get<number>('langgraph.timeout', 30000),
+  maxConcurrency: config.get<number>('langgraph.maxConcurrency', 5),
+  enableStreaming: config.get<boolean>('langgraph.enableStreaming', true),
+  logLevel: config.get<string>('langgraph.logLevel', 'info')
+};
+```
+
+### LLM Configuration
+```typescript
+import { ChatOpenAI } from "@langchain/openai";
+import config from "config";
+
+export const createConfiguredLLM = () => {
+  return new ChatOpenAI({
+    model: config.get<string>('openai.model', 'gpt-4'),
+    temperature: config.get<number>('openai.temperature', 0.6),
+    maxTokens: config.get<number>('openai.maxTokens', 1000),
+    streaming: config.get<boolean>('openai.streaming', true),
+    apiKey: config.get<string>('openai.apiKey'),
+    baseURL: config.get<string>('openai.baseURL')
+  });
+};
+```
+
+These patterns provide a robust foundation for developing LangGraph nodes with proper error handling, logging, performance monitoring, and testing.# LangGraph Development Patterns
+
+## Core LangGraph Integration
+
+### StateGraph Construction
+```typescript
+import { StateGraph, END } from "@langchain/langgraph";
+import { ChatOpenAI } from "@langchain/openai";
+import { GameStateAnnotation } from "./game-state";
+
+// Create LangGraph state machine
+const graph = new StateGraph<GameState>(GameStateAnnotation);
+
+// Add nodes with proper error handling
+graph.addNode("world_creation", async (state: GameState) => {
+  try {
+    // Node implementation with retry logic
+    const result = await callWithRetry(() => createWorld(state));
+    return { ...state, world: result };
+  } catch (error) {
+    logger.error("World creation failed", { error, state });
+    throw error;
+  }
+});
+
+// Add conditional edges
+graph.addConditionalEdges(
+  "world_creation",
+  (state: GameState) => state.gameFlow.nextPhase || "character_creation",
+  {
+    "character_creation": "character_creation",
+    "end": END
+  }
+);
+
+// Compile the graph
+const compiledGraph = graph.compile();
+```
+
+### Node Implementation Patterns
+```typescript
+import { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
+import pRetry from "p-retry";
+
+// Define Zod schema for structured output
+const CharacterSchema = z.object({
+  name: z.string().min(1).max(100),
+  race: z.enum(["human", "elf", "dwarf"]),
+  gender: z.enum(["male", "female"]),
+  biography: z.string().max(500)
+});
+
+// Convert to JSON Schema for LLM
+const characterJsonSchema = zodToJsonSchema(CharacterSchema);
+
+// Node implementation with proper error handling
+export const createCharacterNode = (llm: ChatOpenAI) => {
+  return async (state: GameState): Promise<Partial<GameState>> => {
+    const prompt = `Create a character for the world: ${state.world.name}`;
+    
+    try {
+      const response = await pRetry(
+        () => llm.invoke([
+          { role: "system", content: "You are a game master creating characters." },
+          { role: "user", content: `${prompt}\n\nReturn as JSON matching this schema: ${JSON.stringify(characterJsonSchema)}` }
+        ]),
+        {
+          retries: 3,
+          factor: 2,
+          minTimeout: 1000,
+          onFailedAttempt: (error) => {
+            logger.warn("Character creation attempt failed", { 
+              attempt: error.attemptNumber, 
+              error: error.message 
+            });
+          }
+        }
+      );
+
+      const character = CharacterSchema.parse(JSON.parse(response.content as string));
+      
+      logger.info("Character created successfully", { character: character.name });
+      
+      return {
+        characters: [...state.characters, character],
+        gameFlow: {
+          ...state.gameFlow,
+          currentPhase: "character_creation",
+          completedPhases: [...state.gameFlow.completedPhases, "world_creation"]
+        }
+      };
+    } catch (error) {
+      logger.error("Character creation failed", { error, state });
+      throw new Error(`Character creation failed: ${error.message}`);
+    }
+  };
+};
+```
+
+### Streaming Integration
+```typescript
+import { ChatOpenAI } from "@langchain/openai";
+
+// Streaming node implementation
+export const createStreamingNode = (llm: ChatOpenAI) => {
+  return async (state: GameState, onToken?: (token: string) => void): Promise<Partial<GameState>> => {
+    const stream = await llm.stream([
+      { role: "system", content: "You are a game master." },
+      { role: "user", content: "Continue the story..." }
+    ]);
+
+    let narration = "";
+    for await (const chunk of stream) {
+      const token = chunk.content as string;
+      narration += token;
+      onToken?.(token);
+    }
+
+    return {
+      events: [...state.events, { type: "narration", text: narration }],
+      streaming: { ...state.streaming, isStreaming: false }
+    };
+  };
+};
+```
+
+### Error Handling Patterns
+```typescript
+import { isAbortError } from "./utils/error-handling";
+
+export const createRobustNode = (nodeId: string, nodeFunction: (state: GameState) => Promise<Partial<GameState>>) => {
+  return async (state: GameState): Promise<Partial<GameState>> => {
+    const startTime = Date.now();
+    
+    try {
+      logger.info(`Node ${nodeId} execution started`, { state: state.currentNode });
+      
+      const result = await pRetry(
+        () => nodeFunction(state),
+        {
+          retries: 3,
+          factor: 2,
+          minTimeout: 1000,
+          onFailedAttempt: (error) => {
+            if (isAbortError(error)) {
+              throw error; // Don't retry abort errors
+            }
+            logger.warn(`Node ${nodeId} attempt failed`, { 
+              attempt: error.attemptNumber, 
+              error: error.message 
+            });
+          }
+        }
+      );
+
+      const duration = Date.now() - startTime;
+      logger.info(`Node ${nodeId} execution completed`, { duration });
+
+      return {
+        ...result,
+        performance: {
+          ...state.performance,
+          nodeExecutionTimes: {
+            ...state.performance.nodeExecutionTimes,
+            [nodeId]: duration
+          }
+        }
+      };
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(`Node ${nodeId} execution failed`, { error, duration });
+
+      return {
+        errors: [...state.errors, {
+          id: `error_${Date.now()}`,
+          message: error.message,
+          nodeId,
+          timestamp: new Date().toISOString(),
+          resolved: false
+        }],
+        performance: {
+          ...state.performance,
+          nodeExecutionTimes: {
+            ...state.performance.nodeExecutionTimes,
+            [nodeId]: duration
+          }
+        }
+      };
+    }
+  };
+};
+```
+
+### Memory Management
+```typescript
+// Memory-aware node implementation
+export const createMemoryNode = (llm: ChatOpenAI) => {
+  return async (state: GameState): Promise<Partial<GameState>> => {
+    // Build context from memory
+    const memoryContext = Object.entries(state.memory)
+      .map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
+      .join('\n');
+
+    const prompt = `Based on the game memory:\n${memoryContext}\n\nContinue the story...`;
+
+    const response = await llm.invoke([
+      { role: "system", content: "You are a game master with access to game memory." },
+      { role: "user", content: prompt }
+    ]);
+
+    // Update memory with new information
+    const newMemory = {
+      ...state.memory,
+      lastAction: response.content,
+      timestamp: Date.now()
+    };
+
+    return {
+      memory: newMemory,
+      events: [...state.events, { type: "narration", text: response.content as string }]
+    };
+  };
+};
+```
+
+### Performance Monitoring
+```typescript
+import winston from "winston";
+
+const performanceLogger = winston.createLogger({
+  level: 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  transports: [
+    new winston.transports.File({ filename: 'performance.log' })
+  ]
+});
+
+export const createPerformanceMonitoredNode = (nodeId: string, nodeFunction: (state: GameState) => Promise<Partial<GameState>>) => {
+  return async (state: GameState): Promise<Partial<GameState>> => {
+    const startTime = performance.now();
+    const startMemory = process.memoryUsage();
+
+    try {
+      const result = await nodeFunction(state);
+      
+      const endTime = performance.now();
+      const endMemory = process.memoryUsage();
+      
+      performanceLogger.info("Node performance", {
+        nodeId,
+        executionTime: endTime - startTime,
+        memoryDelta: endMemory.heapUsed - startMemory.heapUsed,
+        timestamp: new Date().toISOString()
+      });
+
+      return result;
+    } catch (error) {
+      const endTime = performance.now();
+      performanceLogger.error("Node performance error", {
+        nodeId,
+        executionTime: endTime - startTime,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+      throw error;
+    }
+  };
+};
+```
+
+## Testing Patterns
+
+### Unit Testing Nodes
+```typescript
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { createCharacterNode } from '../lib/nodes/character-node';
+
+describe('Character Node', () => {
+  let mockLLM: any;
+  let characterNode: (state: GameState) => Promise<Partial<GameState>>;
+
+  beforeEach(() => {
+    mockLLM = {
+      invoke: vi.fn().mockResolvedValue({
+        content: JSON.stringify({
+          name: "Test Character",
+          race: "human",
+          gender: "male",
+          biography: "A test character"
+        })
+      })
+    };
+    characterNode = createCharacterNode(mockLLM);
+  });
+
+  it('should create a character successfully', async () => {
+    const state: GameState = {
+      // ... initial state
+    };
+
+    const result = await characterNode(state);
+
+    expect(result.characters).toHaveLength(1);
+    expect(result.characters[0].name).toBe("Test Character");
+  });
+});
+```
+
+### Integration Testing
+```typescript
+import { describe, it, expect } from 'vitest';
+import { LangGraphGameEngine } from '../lib/game-engine';
+
+describe('Game Engine Integration', () => {
+  it('should execute complete game flow', async () => {
+    const engine = new LangGraphGameEngine(mockNodeRegistry);
+    const initialState = createMockInitialState();
+
+    const result = await engine.execute(initialState);
+
+    expect(result.gameFlow.completedPhases).toContain("world_creation");
+    expect(result.gameFlow.completedPhases).toContain("character_creation");
+  });
+});
+```
+
+## Configuration Management
+
+### Environment Configuration
+```typescript
+import config from "config";
+
+export const langgraphConfig = {
+  maxRetries: config.get<number>('langgraph.maxRetries', 3),
+  timeout: config.get<number>('langgraph.timeout', 30000),
+  maxConcurrency: config.get<number>('langgraph.maxConcurrency', 5),
+  enableStreaming: config.get<boolean>('langgraph.enableStreaming', true),
+  logLevel: config.get<string>('langgraph.logLevel', 'info')
+};
+```
+
+### LLM Configuration
+```typescript
+import { ChatOpenAI } from "@langchain/openai";
+import config from "config";
+
+export const createConfiguredLLM = () => {
+  return new ChatOpenAI({
+    model: config.get<string>('openai.model', 'gpt-4'),
+    temperature: config.get<number>('openai.temperature', 0.6),
+    maxTokens: config.get<number>('openai.maxTokens', 1000),
+    streaming: config.get<boolean>('openai.streaming', true),
+    apiKey: config.get<string>('openai.apiKey'),
+    baseURL: config.get<string>('openai.baseURL')
+  });
+};
+```
+
+These patterns provide a robust foundation for developing LangGraph nodes with proper error handling, logging, performance monitoring, and testing.

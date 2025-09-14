@@ -1,0 +1,481 @@
+---
+description: # Library Integration and Development Patterns  ## Installed Libraries
+alwaysApply: false
+---
+# Library Integration and Development Patterns
+
+## Installed Libraries
+
+### Core LangGraph & LangChain
+- **@langchain/langgraph**: Core LangGraph state machine implementation
+- **@langchain/core**: Base classes and utilities for LangChain ecosystem
+- **@langchain/openai**: Enhanced OpenAI integration with LangChain patterns
+
+### Validation & Type Safety
+- **zod-to-json-schema**: Convert Zod schemas to JSON Schema for LLM structured output
+- **zod**: Runtime validation and type inference (already installed)
+
+### Async & Concurrency
+- **p-retry**: Retry logic for API calls with exponential backoff
+- **p-limit**: Rate limiting for concurrent operations
+- **p-queue**: Queue management for sequential processing
+- **async-mutex**: Mutex for critical sections (already installed)
+
+### Logging & Debugging
+- **winston**: Structured logging with multiple transports
+- **debug**: Development debugging with namespaced loggers
+
+### Configuration Management
+- **dotenv**: Environment variable loading
+- **config**: Configuration management with environment-specific configs
+
+### Testing & Development
+- **vitest**: Fast unit testing framework
+- **@vitest/ui**: Visual test runner interface
+
+## Development Patterns
+
+### LangGraph Integration
+```typescript
+import { StateGraph, END } from "@langchain/langgraph";
+import { ChatOpenAI } from "@langchain/openai";
+import { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
+
+// Use LangChain OpenAI client instead of raw OpenAI
+const llm = new ChatOpenAI({
+  model: "gpt-4",
+  temperature: 0.6,
+  streaming: true
+});
+
+// Convert Zod schemas to JSON Schema for structured output
+const characterSchema = z.object({
+  name: z.string(),
+  race: z.enum(["human", "elf", "dwarf"]),
+  biography: z.string()
+});
+
+const jsonSchema = zodToJsonSchema(characterSchema);
+```
+
+### Retry Logic for API Calls
+```typescript
+import pRetry from "p-retry";
+
+const callWithRetry = async (apiCall: () => Promise<any>) => {
+  return pRetry(apiCall, {
+    retries: 3,
+    factor: 2,
+    minTimeout: 1000,
+    maxTimeout: 5000,
+    onFailedAttempt: (error) => {
+      console.log(`Attempt ${error.attemptNumber} failed: ${error.message}`);
+    }
+  });
+};
+```
+
+### Rate Limiting for API Calls
+```typescript
+import pLimit from "p-limit";
+
+const limit = pLimit(5); // Max 5 concurrent calls
+
+const limitedApiCall = limit(async () => {
+  return await apiCall();
+});
+```
+
+### Structured Logging
+```typescript
+import winston from "winston";
+
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  transports: [
+    new winston.transports.Console(),
+    new winston.transports.File({ filename: 'waidrin.log' })
+  ]
+});
+
+// Usage in LangGraph nodes
+logger.info('Node execution started', { nodeId, state: currentState });
+logger.error('Node execution failed', { nodeId, error: error.message });
+```
+
+### Configuration Management
+```typescript
+import config from "config";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+const appConfig = {
+  openai: {
+    apiKey: config.get<string>('openai.apiKey'),
+    model: config.get<string>('openai.model'),
+    baseURL: config.get<string>('openai.baseURL')
+  },
+  langgraph: {
+    maxRetries: config.get<number>('langgraph.maxRetries'),
+    timeout: config.get<number>('langgraph.timeout')
+  }
+};
+```
+
+### Testing Patterns
+```typescript
+import { describe, it, expect, beforeEach } from 'vitest';
+import { LangGraphGameEngine } from '../lib/game-engine';
+
+describe('LangGraph Game Engine', () => {
+  let engine: LangGraphGameEngine;
+
+  beforeEach(() => {
+    engine = new LangGraphGameEngine(mockNodeRegistry);
+  });
+
+  it('should execute game flow correctly', async () => {
+    const result = await engine.execute(initialState);
+    expect(result.currentNode).toBe('expected_node');
+  });
+});
+```
+
+## Best Practices
+
+### 1. LangGraph Node Implementation
+- Use LangChain OpenAI client for better integration
+- Implement proper error handling with retry logic
+- Add structured logging for debugging
+- Validate inputs and outputs with Zod schemas
+
+### 2. API Integration
+- Always use retry logic for external API calls
+- Implement rate limiting to avoid hitting API limits
+- Use structured logging for API call monitoring
+- Handle errors gracefully with proper error types
+
+### 3. State Management
+- Use Zod schemas for state validation
+- Implement proper error boundaries
+- Add performance monitoring for state updates
+- Use structured logging for state changes
+
+### 4. Testing
+- Write unit tests for individual nodes
+- Test integration between components
+- Mock external API calls during testing
+- Use visual test runner for debugging
+
+### 5. Configuration
+- Use environment-specific configuration files
+- Validate configuration at startup
+- Use structured logging for configuration issues
+- Implement proper error handling for missing config
+
+## File Organization
+
+```
+lib/
+├── index.ts                 # Main entry point
+├── game-engine.ts          # Core LangGraph engine
+├── game-state.ts           # State definitions
+├── node-types.ts           # Node interfaces
+├── backend-integration.ts  # API integration
+├── state-integration.ts    # State management
+├── prompt-integration.ts   # Prompt system
+├── schema-integration.ts   # Validation
+├── utils/
+│   ├── logger.ts           # Winston logger setup
+│   ├── config.ts           # Configuration management
+│   ├── retry.ts            # Retry utilities
+│   └── rate-limit.ts       # Rate limiting utilities
+└── __tests__/
+    ├── game-engine.test.ts
+    ├── nodes.test.ts
+    └── integration.test.ts
+```
+
+## Environment Variables
+
+```bash
+# OpenAI Configuration
+OPENAI_API_KEY=your_api_key
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_MODEL=gpt-4
+
+# LangGraph Configuration
+LANGGRAPH_MAX_RETRIES=3
+LANGGRAPH_TIMEOUT=30000
+
+# Logging Configuration
+LOG_LEVEL=info
+LOG_FILE=waidrin.log
+
+# Development Configuration
+NODE_ENV=development
+DEBUG=waidrin:*
+```
+
+## Scripts
+
+Add to package.json:
+```json
+{
+  "scripts": {
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run",
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  }
+}
+```
+
+This provides a comprehensive foundation for developing the LangGraph engine with proper error handling, logging, testing, and configuration management.# Library Integration and Development Patterns
+
+## Installed Libraries
+
+### Core LangGraph & LangChain
+- **@langchain/langgraph**: Core LangGraph state machine implementation
+- **@langchain/core**: Base classes and utilities for LangChain ecosystem
+- **@langchain/openai**: Enhanced OpenAI integration with LangChain patterns
+
+### Validation & Type Safety
+- **zod-to-json-schema**: Convert Zod schemas to JSON Schema for LLM structured output
+- **zod**: Runtime validation and type inference (already installed)
+
+### Async & Concurrency
+- **p-retry**: Retry logic for API calls with exponential backoff
+- **p-limit**: Rate limiting for concurrent operations
+- **p-queue**: Queue management for sequential processing
+- **async-mutex**: Mutex for critical sections (already installed)
+
+### Logging & Debugging
+- **winston**: Structured logging with multiple transports
+- **debug**: Development debugging with namespaced loggers
+
+### Configuration Management
+- **dotenv**: Environment variable loading
+- **config**: Configuration management with environment-specific configs
+
+### Testing & Development
+- **vitest**: Fast unit testing framework
+- **@vitest/ui**: Visual test runner interface
+
+## Development Patterns
+
+### LangGraph Integration
+```typescript
+import { StateGraph, END } from "@langchain/langgraph";
+import { ChatOpenAI } from "@langchain/openai";
+import { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
+
+// Use LangChain OpenAI client instead of raw OpenAI
+const llm = new ChatOpenAI({
+  model: "gpt-4",
+  temperature: 0.6,
+  streaming: true
+});
+
+// Convert Zod schemas to JSON Schema for structured output
+const characterSchema = z.object({
+  name: z.string(),
+  race: z.enum(["human", "elf", "dwarf"]),
+  biography: z.string()
+});
+
+const jsonSchema = zodToJsonSchema(characterSchema);
+```
+
+### Retry Logic for API Calls
+```typescript
+import pRetry from "p-retry";
+
+const callWithRetry = async (apiCall: () => Promise<any>) => {
+  return pRetry(apiCall, {
+    retries: 3,
+    factor: 2,
+    minTimeout: 1000,
+    maxTimeout: 5000,
+    onFailedAttempt: (error) => {
+      console.log(`Attempt ${error.attemptNumber} failed: ${error.message}`);
+    }
+  });
+};
+```
+
+### Rate Limiting for API Calls
+```typescript
+import pLimit from "p-limit";
+
+const limit = pLimit(5); // Max 5 concurrent calls
+
+const limitedApiCall = limit(async () => {
+  return await apiCall();
+});
+```
+
+### Structured Logging
+```typescript
+import winston from "winston";
+
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  transports: [
+    new winston.transports.Console(),
+    new winston.transports.File({ filename: 'waidrin.log' })
+  ]
+});
+
+// Usage in LangGraph nodes
+logger.info('Node execution started', { nodeId, state: currentState });
+logger.error('Node execution failed', { nodeId, error: error.message });
+```
+
+### Configuration Management
+```typescript
+import config from "config";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+const appConfig = {
+  openai: {
+    apiKey: config.get<string>('openai.apiKey'),
+    model: config.get<string>('openai.model'),
+    baseURL: config.get<string>('openai.baseURL')
+  },
+  langgraph: {
+    maxRetries: config.get<number>('langgraph.maxRetries'),
+    timeout: config.get<number>('langgraph.timeout')
+  }
+};
+```
+
+### Testing Patterns
+```typescript
+import { describe, it, expect, beforeEach } from 'vitest';
+import { LangGraphGameEngine } from '../lib/game-engine';
+
+describe('LangGraph Game Engine', () => {
+  let engine: LangGraphGameEngine;
+
+  beforeEach(() => {
+    engine = new LangGraphGameEngine(mockNodeRegistry);
+  });
+
+  it('should execute game flow correctly', async () => {
+    const result = await engine.execute(initialState);
+    expect(result.currentNode).toBe('expected_node');
+  });
+});
+```
+
+## Best Practices
+
+### 1. LangGraph Node Implementation
+- Use LangChain OpenAI client for better integration
+- Implement proper error handling with retry logic
+- Add structured logging for debugging
+- Validate inputs and outputs with Zod schemas
+
+### 2. API Integration
+- Always use retry logic for external API calls
+- Implement rate limiting to avoid hitting API limits
+- Use structured logging for API call monitoring
+- Handle errors gracefully with proper error types
+
+### 3. State Management
+- Use Zod schemas for state validation
+- Implement proper error boundaries
+- Add performance monitoring for state updates
+- Use structured logging for state changes
+
+### 4. Testing
+- Write unit tests for individual nodes
+- Test integration between components
+- Mock external API calls during testing
+- Use visual test runner for debugging
+
+### 5. Configuration
+- Use environment-specific configuration files
+- Validate configuration at startup
+- Use structured logging for configuration issues
+- Implement proper error handling for missing config
+
+## File Organization
+
+```
+lib/
+├── index.ts                 # Main entry point
+├── game-engine.ts          # Core LangGraph engine
+├── game-state.ts           # State definitions
+├── node-types.ts           # Node interfaces
+├── backend-integration.ts  # API integration
+├── state-integration.ts    # State management
+├── prompt-integration.ts   # Prompt system
+├── schema-integration.ts   # Validation
+├── utils/
+│   ├── logger.ts           # Winston logger setup
+│   ├── config.ts           # Configuration management
+│   ├── retry.ts            # Retry utilities
+│   └── rate-limit.ts       # Rate limiting utilities
+└── __tests__/
+    ├── game-engine.test.ts
+    ├── nodes.test.ts
+    └── integration.test.ts
+```
+
+## Environment Variables
+
+```bash
+# OpenAI Configuration
+OPENAI_API_KEY=your_api_key
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_MODEL=gpt-4
+
+# LangGraph Configuration
+LANGGRAPH_MAX_RETRIES=3
+LANGGRAPH_TIMEOUT=30000
+
+# Logging Configuration
+LOG_LEVEL=info
+LOG_FILE=waidrin.log
+
+# Development Configuration
+NODE_ENV=development
+DEBUG=waidrin:*
+```
+
+## Scripts
+
+Add to package.json:
+```json
+{
+  "scripts": {
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run",
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  }
+}
+```
+
+This provides a comprehensive foundation for developing the LangGraph engine with proper error handling, logging, testing, and configuration management.

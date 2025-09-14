@@ -1,0 +1,156 @@
+---
+globs: lib/state.ts,lib/engines/*/state.ts
+description: State management patterns with Zustand and Immer
+---
+
+# State Management
+
+## State Architecture
+
+Waidrin uses Zustand with Immer for state management, providing immutable updates and performance optimization:
+
+- **Main Store**: [lib/state.ts](mdc:lib/state.ts) - Core state management
+- **Engine States**: Engine-specific state implementations
+- **Immer Integration**: Immutable updates with draft patterns
+
+## Zustand Store Structure
+
+```typescript
+export const useStateStore = create<StoredState>()(
+  persist(
+    immer((set, get) => ({
+      ...initialState,
+      plugins: [],
+      backends: {},
+      activeBackend: "default",
+      set: set,
+      setAsync: async (updater) => {
+        // Async state updates with mutex
+      },
+    })),
+    {
+      name: "state",
+      partialize: (state) => {
+        // Persistence configuration
+      },
+    },
+  ),
+);
+```
+
+## State Update Patterns
+
+### Synchronous Updates
+```typescript
+// Use set for synchronous updates
+getState().set((state) => {
+  state.view = "chat";
+  state.events.push(newEvent);
+});
+```
+
+### Asynchronous Updates
+```typescript
+// Use setAsync for async operations
+await getState().setAsync(async (state) => {
+  const result = await someAsyncOperation();
+  state.data = result;
+});
+```
+
+### Performance Optimization
+```typescript
+// Use useShallow for performance
+const { view, events } = useStateStore(
+  useShallow((state) => ({
+    view: state.view,
+    events: state.events,
+  }))
+);
+```
+
+## Immer Integration
+
+### Draft State Updates
+- Always use `WritableDraft<T>` for state updates
+- Never mutate Immer drafts inside async callbacks
+- Use separate variables for async accumulation
+
+### Correct Pattern
+```typescript
+// ✅ CORRECT - Mutate draft within producer
+getState().set((state) => {
+  state.events.push(newEvent);
+  state.view = "chat";
+});
+```
+
+### Anti-Pattern
+```typescript
+// ❌ WRONG - Mutate draft in async callback
+getState().set((state) => {
+  someAsyncOperation().then((result) => {
+    state.data = result; // This will cause issues
+  });
+});
+```
+
+## State Schema
+
+### Core State Properties
+- `view`: Current game view (welcome, connection, genre, character, scenario, chat)
+- `world`: Game world configuration
+- `characters`: Character definitions
+- `events`: Game event history
+- `actions`: Available actions
+
+### Engine-Specific State
+- `currentNode`: Current engine node
+- `nodeHistory`: Execution history
+- `memory`: Game memory and context
+- `streaming`: Streaming state
+
+## Persistence
+
+### Persisted State
+- Game configuration
+- Character data
+- Event history
+- User preferences
+
+### Excluded State
+- Functions and class instances
+- Backend connections
+- Temporary state
+
+## Error Handling
+
+### State Errors
+- Use try-catch in state updates
+- Roll back changes on error
+- Provide error recovery mechanisms
+
+### Async State Updates
+- Use mutex for async operations
+- Handle concurrent updates
+- Prevent state corruption
+
+## Development Guidelines
+
+### Adding New State
+1. Define schema in [lib/schemas.ts](mdc:lib/schemas.ts)
+2. Add to initial state
+3. Update persistence configuration
+4. Add to TypeScript types
+
+### State Updates
+- Use Immer for all state mutations
+- Prefer `setAsync` for async operations
+- Use `useShallow` for performance
+- Handle errors gracefully
+
+### Testing State
+- Test state updates in isolation
+- Verify persistence works correctly
+- Test error handling and recovery
+- Validate state consistency

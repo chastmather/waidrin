@@ -1,0 +1,144 @@
+---
+description: Development workflow and best practices
+---
+
+# Development Workflow Rules
+
+## Development Environment
+
+### Prerequisites
+- **Node.js**: Latest LTS version
+- **Package Manager**: npm (preferred) or yarn
+- **LLM Server**: llama.cpp server running locally
+- **Model**: Mistral Small 2506 recommended
+
+### Setup Commands
+```bash
+npm install
+npm run dev  # Development with hot reload
+npm run build  # Production build
+npm run start  # Production server
+npm run lint  # Linting with Biome
+```
+
+## Code Quality Standards
+
+### Linting and Formatting
+- **Biome**: Use Biome for linting and formatting
+- **Configuration**: Follow [biome.json](mdc:biome.json) settings
+- **Auto-fix**: Use `npm run lint` to auto-fix issues
+- **Pre-commit**: Run linting before commits
+
+### TypeScript Standards
+- **Strict Mode**: Always use strict TypeScript
+- **Type Safety**: Prefer type inference over explicit types
+- **Zod Validation**: Use Zod for all data validation
+- **Error Handling**: Handle all possible error cases
+
+## Git Workflow
+
+### Branching Strategy
+- **main**: Production-ready code
+- **feature/**: Feature development branches
+- **bugfix/**: Bug fix branches
+- **hotfix/**: Critical production fixes
+
+### Commit Messages
+- **Format**: Use conventional commit format
+- **Scope**: Include affected component/area
+- **Description**: Clear, concise description
+- **Examples**:
+  - `feat(engine): add location change validation`
+  - `fix(ui): resolve character selection bug`
+  - `docs(readme): update installation instructions`
+
+## Testing Strategy
+
+### Unit Testing
+- **Components**: Test React components in isolation
+- **Utilities**: Test utility functions
+- **State Management**: Test state updates and selectors
+- **Backend**: Test backend implementations
+
+### Integration Testing
+- **State Machine**: Test complete game flow
+- **Plugin System**: Test plugin loading and execution
+- **API Integration**: Test LLM API interactions
+- **Error Scenarios**: Test error handling paths
+
+### Manual Testing
+- **Game Flow**: Test complete user journey
+- **Error Handling**: Test error recovery
+- **Performance**: Test with various model sizes
+- **Cross-browser**: Test in different browsers
+
+## Performance Optimization
+
+### Bundle Optimization
+- **Code Splitting**: Use dynamic imports for large components
+- **Tree Shaking**: Remove unused code
+- **Asset Optimization**: Optimize images and static assets
+- **Bundle Analysis**: Use webpack-bundle-analyzer
+
+### Runtime Performance
+- **State Updates**: Minimize unnecessary re-renders
+- **Throttling**: Use throttling for frequent updates
+- **Memoization**: Use React.memo for expensive components
+- **Lazy Loading**: Load components only when needed
+
+## Debugging
+
+### Development Tools
+- **React DevTools**: Use React DevTools for component debugging
+- **Zustand DevTools**: Use Zustand DevTools for state debugging
+- **Browser DevTools**: Use browser DevTools for performance analysis
+- **State Debugger**: Use built-in StateDebugger component
+
+### Logging
+- **Debug Logging**: Use console.log for development debugging
+- **State Logging**: Enable state logging in development
+- **API Logging**: Log API requests and responses
+- **Error Logging**: Log errors with context
+
+## Deployment
+
+### Production Build
+- **Build Command**: `npm run build`
+- **Static Export**: Use Next.js static export if needed
+- **Environment Variables**: Set production environment variables
+- **Asset Optimization**: Optimize all static assets
+
+### Environment Configuration
+- **API URLs**: Configure production API endpoints
+- **Model Settings**: Set production model parameters
+- **Plugin Configuration**: Configure production plugins
+- **Error Handling**: Set production error handling
+
+## Documentation
+
+### Code Documentation
+- **JSDoc**: Use JSDoc for function documentation
+- **README**: Keep README.md updated
+- **API Documentation**: Document API interfaces
+- **Plugin Documentation**: Document plugin development
+
+### Architecture Documentation
+- **State Machine**: Document game state flow
+- **Component Hierarchy**: Document component structure
+- **Plugin System**: Document plugin architecture
+- **Backend Integration**: Document backend interfaces
+
+## Troubleshooting
+
+### Common Issues
+- **State Hydration**: Handle state hydration issues
+- **Plugin Loading**: Debug plugin loading failures
+- **API Errors**: Debug LLM API issues
+- **Performance**: Identify performance bottlenecks
+
+### Debug Steps
+1. Check browser console for errors
+2. Use StateDebugger to inspect state
+3. Enable debug logging
+4. Test with minimal configuration
+5. Check network requests and responses

@@ -1,0 +1,196 @@
+---
+globs: app/**/*.ts,app/**/*.tsx,next.config.ts
+description: Next.js 15 patterns and app router guidelines
+---
+
+# Next.js 15 Patterns
+
+## App Router Architecture
+
+Waidrin uses Next.js 15 with the app router for modern React development:
+
+- **App Directory**: [app/](mdc:app/) - Next.js 15 app router
+- **Layouts**: [app/layout.tsx](mdc:app/layout.tsx) - Root layout
+- **Pages**: [app/page.tsx](mdc:app/page.tsx) - Home page
+- **API Routes**: [app/plugins/](mdc:app/plugins/) - Plugin API routes
+
+## App Router Patterns
+
+### Layout Structure
+```typescript
+// app/layout.tsx
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
+import './globals.css';
+
+export const metadata: Metadata = {
+  title: 'Waidrin',
+  description: 'AI Role-Playing Game Engine',
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body className={inter.className}>
+        {children}
+      </body>
+    </html>
+  );
+}
+```
+
+### Page Components
+```typescript
+// app/page.tsx
+import { MainMenu } from '@/components/MainMenu';
+
+export default function HomePage() {
+  return <MainMenu />;
+}
+```
+
+### API Routes
+```typescript
+// app/plugins/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+
+export async function GET(request: NextRequest) {
+  // Handle plugin API requests
+  return NextResponse.json({ plugins: [] });
+}
+```
+
+## Component Patterns
+
+### Server Components
+- Default to server components when possible
+- Use for static content and data fetching
+- No client-side interactivity
+
+### Client Components
+- Use `"use client"` directive for interactivity
+- Required for hooks, event handlers, and state
+- Use sparingly for performance
+
+### Component Structure
+```typescript
+// Server component (default)
+export default function ServerComponent() {
+  return <div>Static content</div>;
+}
+
+// Client component
+"use client";
+import { useState } from 'react';
+
+export default function ClientComponent() {
+  const [state, setState] = useState();
+  return <div>Interactive content</div>;
+}
+```
+
+## Styling Patterns
+
+### Tailwind CSS
+- Use Tailwind for styling
+- Follow design system patterns
+- Use responsive design utilities
+
+### Global Styles
+- [app/globals.css](mdc:app/globals.css) - Global styles
+- Import Tailwind directives
+- Add custom CSS variables
+
+## Performance Optimization
+
+### Image Optimization
+```typescript
+import Image from 'next/image';
+
+export default function OptimizedImage() {
+  return (
+    <Image
+      src="/images/logo.png"
+      alt="Waidrin Logo"
+      width={200}
+      height={200}
+      priority
+    />
+  );
+}
+```
+
+### Dynamic Imports
+```typescript
+import dynamic from 'next/dynamic';
+
+const DynamicComponent = dynamic(() => import('./HeavyComponent'), {
+  loading: () => <p>Loading...</p>,
+});
+```
+
+### Metadata API
+```typescript
+export const metadata: Metadata = {
+  title: 'Waidrin - AI RPG',
+  description: 'AI-powered role-playing game engine',
+  openGraph: {
+    title: 'Waidrin',
+    description: 'AI-powered role-playing game engine',
+  },
+};
+```
+
+## API Routes
+
+### Plugin API
+- [app/plugins/route.ts](mdc:app/plugins/route.ts) - Plugin management
+- [app/plugins/[...path]/route.ts](mdc:app/plugins/[...path]/route.ts) - Dynamic plugin routes
+
+### API Patterns
+```typescript
+// app/api/example/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+
+export async function GET(request: NextRequest) {
+  try {
+    const data = await fetchData();
+    return NextResponse.json(data);
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Internal Server Error' },
+      { status: 500 }
+    );
+  }
+}
+```
+
+## Development Guidelines
+
+### File Organization
+- Use app router structure
+- Group related components
+- Follow Next.js conventions
+- Use TypeScript for all files
+
+### Performance
+- Optimize images and assets
+- Use dynamic imports for heavy components
+- Implement proper caching strategies
+- Monitor bundle size
+
+### SEO and Metadata
+- Use metadata API for SEO
+- Implement proper meta tags
+- Use structured data when appropriate
+- Optimize for search engines
+
+### Error Handling
+- Use error boundaries for client components
+- Implement proper error pages
+- Handle API errors gracefully
+- Provide user-friendly error messages

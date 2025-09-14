@@ -1,0 +1,133 @@
+---
+description: Bug fixes and improvements made to the Waidrin codebase
+globs: lib/engine-original.ts,lib/state.ts,lib/backend.ts
+---
+
+# Bug Fixes and Improvements
+
+## Streaming Text Loss Bug Fix
+
+### Problem
+The original upstream code had a streaming bug where text would be lost during streaming completion due to:
+1. **Immer Draft Mutation**: Modifying `event.text` directly in async callbacks
+2. **Double Accumulation**: Both backend and engine were accumulating streaming text
+3. **State Update Issues**: `updateState()` couldn't properly capture draft changes
+
+### Solution
+Fixed by trusting the backend's accumulation and following Immer best practices:
+
+```typescript
+// Before (buggy)
+event.text = await backend.getNarration(prompt, (token: string, count: number) => {
+  event.text += token;  // ❌ Draft mutation in callback
+  onToken(token, count);
+  updateState();
+});
+
+// After (fixed)
+event.text = await backend.getNarration(prompt, (token: string, count: number) => {
+  onToken(token, count);  // ✅ Only handle progress
+  updateState();          // ✅ Update state during streaming
+});
+// ✅ Backend returns complete accumulated text
+```
+
+## Environment Variable Support
+
+### Added Features
+- Default API URL, API Key, and Model from environment variables
+- Runtime override capability through UI
+- Proper validation with Zod schemas
+
+### Implementation
+```typescript
+export const initialState: State = schemas.State.parse({
+  apiUrl: process.env.OPENAI_API_URL || "https://api.openai.com/v1/",
+  apiKey: process.env.OPENAI_API_KEY || "",
+  model: process.env.OPENAI_MODEL || "",
+  // ... other properties
+});
+```
+
+## Zod URL Validation Fix
+
+### Problem
+Empty string default for `apiUrl` caused Zod validation error:
+```
+"Invalid URL" - empty string is not a valid URL format
+```
+
+### Solution
+Provide valid default URL:
+```typescript
+apiUrl: process.env.OPENAI_API_URL || "https://api.openai.com/v1/",
+```
+
+## Engine Switching System
+
+### Architecture Improvements
+- Modular engine system supporting multiple implementations
+- Runtime switching between "current" and "langgraph" engines
+- Clean `GameEngine` interface abstraction for all engines
+- Current engine re-exports original functions for compatibility
+
+### Files Created
+- [lib/engines/index.ts](mdc:lib/engines/index.ts) - Engine factory and switcher
+- [lib/engines/current/engine.ts](mdc:lib/engines/current/engine.ts) - Current engine wrapper
+- [lib/engines/langgraph/src/](mdc:lib/engines/langgraph/src/) - LangGraph engine scaffold
+
+## Upstream Comparison
+
+### Bugs Fixed from Upstream
+1. **Streaming Text Loss**: Fixed Immer draft mutation issue
+2. **Missing Environment Support**: Added env var defaults
+3. **URL Validation**: Fixed empty string validation error
+
+### Missing Features from Upstream
+1. **Summary Streaming**: Scene summary streaming not implemented
+2. **Complete Feature Parity**: Some advanced features may be missing
+
+## Development Workflow Improvements
+
+### Cursor Rules
+- Created comprehensive rule files for different aspects
+- Streaming implementation patterns
+- LangGraph development guidelines
+- Engine switching architecture
+- Environment configuration
+- Immer state management
+
+### Code Organization
+- Separated engines into modular structure
+- Clear separation of concerns
+- Better error handling and validation
+
+## Testing and Validation
+
+### Completed
+- ✅ Streaming text loss fix verified
+- ✅ Environment variables working
+- ✅ URL validation fixed
+- ✅ Engine switching functional
+
+### Pending
+- ⚠️ LangGraph implementation needs validation
+- ⚠️ Missing summary streaming feature
+- ⚠️ Complete feature parity with upstream
+
+## Best Practices Established
+
+### Immer Usage
+- Never mutate drafts in async callbacks
+- Use separate variables for async accumulation
+- Trust backend for complete text accumulation
+
+### State Management
+- Use `setAsync` for async operations
+- Implement proper error handling and rollback
+- Follow Zustand + Immer patterns
+
+### Engine Architecture
+- Clean interface abstraction
+- Modular, swappable implementations
+- Runtime configuration support

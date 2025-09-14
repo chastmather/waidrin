@@ -1,0 +1,89 @@
+---
+description: LangGraph engine development patterns and unconfirmed changes
+globs: lib/engines/langgraph/**/*.ts
+---
+
+# LangGraph Engine Development Rules
+
+## ⚠️ UNCONFIRMED CHANGES WARNING
+
+All LangGraph implementation changes are **UNCONFIRMED** and need thorough testing and validation. Changes were made based on documentation review but have NOT been verified to be correct.
+
+## State Management Pattern
+
+### GameState Annotation
+- Uses `Annotation.Root` pattern from LangGraph instead of Zod schemas
+- Maintains separate Zod schema for validation
+- State is defined in [lib/engines/langgraph/src/types/game-state.ts](mdc:lib/engines/langgraph/src/types/game-state.ts)
+
+```typescript
+// ⚠️ UNCONFIRMED: LangGraph state annotation
+export const GameStateAnnotation = Annotation.Root({
+  currentNode: Annotation<string>,
+  nodeHistory: Annotation<Array<{ nodeId: string; timestamp: string; duration: number; success: boolean }>>,
+  // ... other properties
+});
+```
+
+## Graph Construction
+
+### StateGraph Pattern
+- Constructor takes `GameStateAnnotation` directly
+- Must call `.compile()` before use
+- Entry point uses `"__start__"` -> first node edge
+
+```typescript
+// ⚠️ UNCONFIRMED: Graph construction
+const graph = new StateGraph<GameState>(GameStateAnnotation);
+// Add nodes and edges...
+return graph.compile();
+```
+
+## Node Wrapper Functions
+
+### Return Pattern
+- Node functions should return `Partial<GameState>` (state updates)
+- NOT the full state object
+- Based on LangGraph documentation examples
+
+```typescript
+// ⚠️ UNCONFIRMED: Node wrapper pattern
+private createNodeWrapper(nodeId: string) {
+  return async (state: GameState): Promise<Partial<GameState>> => {
+    // Node execution logic...
+    return {
+      currentNode: nodeId,
+      // ... other state updates
+    };
+  };
+}
+```
+
+## Development Status
+
+### Completed (Unconfirmed)
+- [x] State definition with Annotation.Root
+- [x] Graph construction with proper compilation
+- [x] Node wrapper functions
+- [x] Basic engine class structure
+
+### Pending
+- [ ] Verify LangGraph TypeScript API usage
+- [ ] Fix type errors and missing properties
+- [ ] Create minimal working example
+- [ ] Test basic functionality
+
+## File Structure
+
+- [lib/engines/langgraph/src/core/game-engine.ts](mdc:lib/engines/langgraph/src/core/game-engine.ts) - Main engine class
+- [lib/engines/langgraph/src/types/game-state.ts](mdc:lib/engines/langgraph/src/types/game-state.ts) - State definitions
+- [lib/engines/langgraph/src/types/node-types.ts](mdc:lib/engines/langgraph/src/types/node-types.ts) - Node interfaces
+
+## Testing Approach
+
+Before using in production:
+1. Create minimal working example
+2. Verify all TypeScript types compile
+3. Test basic graph execution
+4. Validate state updates work correctly
+5. Compare with LangGraph documentation examples

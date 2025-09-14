@@ -1,0 +1,230 @@
+---
+globs: plugins/**/*.js,plugins/**/*.json,app/plugins/**/*.ts
+description: Plugin system development and extension patterns
+---
+
+# Plugin System
+
+## Plugin Architecture
+
+Waidrin features a comprehensive plugin system for extending functionality:
+
+- **Plugin Interface**: [lib/state.ts](mdc:lib/state.ts) - Core plugin interface
+- **Plugin API**: [app/plugins/](mdc:app/plugins/) - Plugin management API
+- **Plugin Directory**: [plugins/](mdc:plugins/) - Plugin implementations
+
+## Plugin Interface
+
+```typescript
+export type Plugin = Partial<{
+  // Initialize plugin with settings and context
+  init(settings: Record<string, unknown>, context: unknown): Promise<void>;
+  
+  // Provide custom backends
+  getBackends(): Promise<Record<string, Backend>>;
+  
+  // Handle location changes
+  onLocationChange(newLocation: Location, state: WritableDraft<State>): Promise<void>;
+}>;
+```
+
+## Plugin Structure
+
+### Plugin Manifest
+```json
+// plugins/demo-plugin/manifest.json
+{
+  "name": "demo-plugin",
+  "version": "1.0.0",
+  "description": "Demo plugin for Waidrin",
+  "main": "main.js",
+  "author": "Developer",
+  "license": "MIT",
+  "dependencies": {},
+  "settings": {
+    "enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enable the plugin"
+    }
+  }
+}
+```
+
+### Plugin Implementation
+```javascript
+// plugins/demo-plugin/main.js
+export default {
+  async init(settings, context) {
+    console.log('Demo plugin initialized with settings:', settings);
+  },
+  
+  async getBackends() {
+    return {
+      'demo-backend': {
+        getNarration: async (prompt, onToken) => {
+          // Custom narration logic
+          return 'Demo narration';
+        },
+        // ... other backend methods
+      }
+    };
+  },
+  
+  async onLocationChange(newLocation, state) {
+    // Handle location change
+    console.log('Location changed to:', newLocation);
+  }
+};
+```
+
+## Plugin Management
+
+### Plugin Wrapper
+```typescript
+export interface PluginWrapper {
+  name: string;
+  enabled: boolean;
+  settings: Record<string, unknown>;
+  plugin: Plugin;
+}
+```
+
+### Plugin State
+```typescript
+export interface Plugins {
+  plugins: PluginWrapper[];
+  backends: Record<string, Backend>;
+  activeBackend: string;
+}
+```
+
+## Plugin API Routes
+
+### Plugin Discovery
+```typescript
+// app/plugins/route.ts
+export async function GET() {
+  const plugins = await discoverPlugins();
+  return NextResponse.json({ plugins });
+}
+```
+
+### Plugin Execution
+```typescript
+// app/plugins/[...path]/route.ts
+export async function POST(request: NextRequest) {
+  const { pathname } = new URL(request.url);
+  const pluginPath = pathname.split('/').slice(2).join('/');
+  
+  const result = await executePlugin(pluginPath, request);
+  return NextResponse.json(result);
+}
+```
+
+## Plugin Development
+
+### Creating a Plugin
+1. Create plugin directory in `plugins/`
+2. Add `manifest.json` with plugin metadata
+3. Implement `main.js` with plugin logic
+4. Define settings schema
+5. Test plugin functionality
+
+### Plugin Settings
+```json
+{
+  "settings": {
+    "apiKey": {
+      "type": "string",
+      "required": true,
+      "description": "API key for the plugin"
+    },
+    "timeout": {
+      "type": "number",
+      "default": 5000,
+      "description": "Request timeout in milliseconds"
+    }
+  }
+}
+```
+
+### Backend Plugins
+```javascript
+export default {
+  async getBackends() {
+    return {
+      'custom-backend': {
+        getNarration: async (prompt, onToken) => {
+          // Custom LLM integration
+          const response = await fetch('/api/custom-llm', {
+            method: 'POST',
+            body: JSON.stringify(prompt)
+          });
+          return response.text();
+        },
+        
+        getObject: async (prompt, schema, onToken) => {
+          // Custom object generation
+          const response = await this.getNarration(prompt, onToken);
+          return JSON.parse(response);
+        },
+        
+        abort: () => {
+          // Handle abort requests
+        },
+        
+        isAbortError: (error) => {
+          // Check if error is abort error
+          return error.name === 'AbortError';
+        }
+      }
+    };
+  }
+};
+```
+
+## Plugin Lifecycle
+
+### Initialization
+1. Plugin is discovered and loaded
+2. Settings are validated against schema
+3. `init()` method is called with settings and context
+4. Plugin is registered in the plugin system
+
+### Execution
+1. Plugin methods are called based on game events
+2. Backend plugins provide custom LLM integration
+3. Event plugins handle game state changes
+4. Plugins can modify game state through callbacks
+
+### Cleanup
+1. Plugin is disabled or removed
+2. Resources are cleaned up
+3. Plugin is unregistered from the system
+
+## Development Guidelines
+
+### Plugin Design
+- Keep plugins focused and single-purpose
+- Use clear, descriptive names
+- Provide comprehensive documentation
+- Handle errors gracefully
+
+### Performance
+- Minimize plugin overhead
+- Use efficient data structures
+- Avoid blocking operations
+- Cache expensive computations
+
+### Security
+- Validate all inputs
+- Sanitize user data
+- Use secure communication
+- Follow security best practices
+
+### Testing
+- Test plugin functionality thoroughly
+- Verify error handling
+- Test with different settings
+- Ensure compatibility across engines

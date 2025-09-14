@@ -1,0 +1,68 @@
+---
+alwaysApply: true
+description: Architecture patterns and design principles for Waidrin
+---
+
+# Architecture Patterns
+
+## Core Architecture
+
+Waidrin follows a modular architecture with clear separation of concerns:
+
+- **Engine**: [lib/engine.ts](mdc:lib/engine.ts) - Main game state machine and orchestration
+- **State Management**: [lib/state.ts](mdc:lib/state.ts) - Zustand store with Immer for immutable updates
+- **Backend**: [lib/backend.ts](mdc:lib/backend.ts) - LLM integration and API abstraction
+- **Schemas**: [lib/schemas.ts](mdc:lib/schemas.ts) - Zod validation schemas for all data types
+- **Prompts**: [lib/prompts.ts](mdc:lib/prompts.ts) - LLM prompt templates
+
+## Directory Structure
+
+- `app/` - Next.js 15 app router pages and layouts
+- `components/` - Reusable React components
+- `views/` - Page-level view components (Welcome, Chat, etc.)
+- `lib/` - Core business logic and utilities
+- `plugins/` - Plugin system for extending functionality
+- `public/images/` - Static assets and AI-generated artwork
+
+## Key Patterns
+
+### State Machine
+The game follows a strict view state machine: welcome → connection → genre → character → scenario → chat
+
+### Event-Driven
+All game events are typed and validated through Zod schemas
+
+### Plugin System
+Extensible architecture with plugin support for backends and custom functionality
+
+### Immutable Updates
+All state changes use Immer for safe, immutable updates
+
+### Type Safety
+Full TypeScript with strict validation using Zod schemas
+
+## File Naming Conventions
+
+- Components: PascalCase (e.g., `MainMenu.tsx`)
+- Views: PascalCase (e.g., `CharacterSelect.tsx`)
+- Utilities: camelCase (e.g., `backend.ts`)
+- Schemas: camelCase (e.g., `schemas.ts`)
+
+## Development Guidelines
+
+### Adding New Features
+1. Define Zod schemas in [lib/schemas.ts](mdc:lib/schemas.ts)
+2. Add state management in [lib/state.ts](mdc:lib/state.ts)
+3. Create components in `components/` or `views/`
+4. Add engine logic if needed
+5. Update prompts in [lib/prompts.ts](mdc:lib/prompts.ts)
+
+### Plugin Development
+- Plugins should implement the `Plugin` interface
+- Use the plugin system for extensibility
+- Follow the plugin manifest structure
+
+### Error Handling
+- Use `isAbortError()` for user cancellations
+- Provide clear error messages
+- Handle async operations gracefully

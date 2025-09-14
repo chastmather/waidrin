@@ -1,0 +1,145 @@
+---
+description: Plugin development and extension system
+---
+
+# Plugin Development Rules
+
+## Plugin System Architecture
+
+Waidrin uses a plugin system to extend functionality. Plugins can provide custom backends, add UI components, and react to game events.
+
+## Plugin Structure
+
+### Manifest File
+```json
+{
+  "name": "plugin-name",
+  "version": "1.0.0",
+  "main": "main.js",
+  "settings": {
+    "apiKey": "",
+    "enabled": true
+  }
+}
+```
+
+### Plugin Class
+```typescript
+export default class PluginName {
+  async init(settings: Record<string, unknown>, context: unknown): Promise<void> {
+    // Initialize plugin
+  }
+  
+  async getBackends(): Promise<Record<string, Backend>> {
+    // Return custom backends
+  }
+  
+  async onLocationChange(newLocation: Location, state: WritableDraft<State>): Promise<void> {
+    // React to location changes
+  }
+}
+```
+
+## Plugin Development Guidelines
+
+### Backend Plugins
+- **Interface Compliance**: Implement the `Backend` interface
+- **Error Handling**: Handle API errors gracefully
+- **Abort Support**: Support request cancellation
+- **Settings Management**: Use plugin settings for configuration
+
+### UI Plugins
+- **Component Registration**: Register custom components
+- **Theme Integration**: Follow Radix UI theme guidelines
+- **State Access**: Use proper state selectors
+- **Event Handling**: Handle user interactions properly
+
+### Event Hooks
+- **Location Changes**: React to location transitions
+- **Character Introductions**: Handle new character appearances
+- **State Updates**: Modify state safely using Immer drafts
+- **Async Operations**: Use proper async/await patterns
+
+## Plugin Loading
+
+### Dynamic Import
+- **Webpack Ignore**: Use `/* webpackIgnore: true */` for dynamic imports
+- **Error Handling**: Handle import failures gracefully
+- **Settings Persistence**: Preserve plugin settings across loads
+- **State Integration**: Integrate with global state properly
+
+### Plugin Management
+- **Enable/Disable**: Support plugin enabling/disabling
+- **Settings UI**: Provide settings interface for plugins
+- **Error Recovery**: Handle plugin errors without breaking the app
+- **Version Management**: Handle plugin version updates
+
+## Plugin Context
+
+### Context Object
+```typescript
+class Context {
+  constructor(pluginName: string) {
+    this.pluginName = pluginName;
+  }
+  
+  // Provide plugin-specific context
+}
+```
+
+### State Access
+- **Read-Only**: Plugins receive WritableDraft<State> for safe updates
+- **Validation**: Always validate state changes
+- **Immer Usage**: Use Immer patterns for state updates
+- **Error Handling**: Handle state update errors
+
+## Best Practices
+
+### Security
+- **Input Validation**: Validate all plugin inputs
+- **Sandboxing**: Isolate plugin code execution
+- **Error Boundaries**: Prevent plugin errors from crashing the app
+- **Resource Limits**: Limit plugin resource usage
+
+### Performance
+- **Lazy Loading**: Load plugins only when needed
+- **Caching**: Cache plugin results when appropriate
+- **Memory Management**: Clean up plugin resources
+- **Async Operations**: Use proper async patterns
+
+### Testing
+- **Unit Tests**: Test plugin functionality in isolation
+- **Integration Tests**: Test plugin integration with the main app
+- **Error Scenarios**: Test error handling paths
+- **Performance Tests**: Test plugin performance impact
+
+## Plugin Examples
+
+### Demo Plugin
+The [plugins/demo-plugin/](mdc:plugins/demo-plugin/) directory contains a reference implementation showing:
+- Manifest structure
+- Plugin class implementation
+- Settings management
+- Backend integration
+- Event handling
+
+### Custom Backend Plugin
+```typescript
+export default class CustomBackendPlugin {
+  async getBackends(): Promise<Record<string, Backend>> {
+    return {
+      "custom-backend": new CustomBackend()
+    };
+  }
+}
+```
+
+### UI Extension Plugin
+```typescript
+export default class UIExtensionPlugin {
+  async init(settings: Record<string, unknown>, context: Context): Promise<void> {
+    // Register custom UI components
+    context.registerComponent("CustomComponent", CustomComponent);
+  }
+}
+```

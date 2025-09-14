@@ -1,0 +1,169 @@
+<svg width="1200" height="800" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .node { fill: #e1f5fe; stroke: #01579b; stroke-width: 2; }
+      .core { fill: #e1f5fe; stroke: #01579b; }
+      .state { fill: #f3e5f5; stroke: #4a148c; }
+      .nodes { fill: #e8f5e8; stroke: #1b5e20; }
+      .tools { fill: #fff3e0; stroke: #e65100; }
+      .backend { fill: #fce4ec; stroke: #880e4f; }
+      .external { fill: #f5f5f5; stroke: #424242; }
+      .text { font-family: Arial, sans-serif; font-size: 12px; text-anchor: middle; }
+      .arrow { stroke: #666; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#666" />
+    </marker>
+  </defs>
+  
+  <!-- Title -->
+  <text x="600" y="30" class="text" font-size="20" font-weight="bold">Waidrin LangGraph Game Engine Dependencies</text>
+  
+  <!-- Core Engine -->
+  <rect x="50" y="60" width="200" height="40" class="core" rx="5"/>
+  <text x="150" y="85" class="text">LangGraphGameEngine</text>
+  
+  <rect x="50" y="120" width="200" height="30" class="core" rx="5"/>
+  <text x="150" y="140" class="text">StateGraph</text>
+  
+  <rect x="50" y="170" width="200" height="30" class="core" rx="5"/>
+  <text x="150" y="190" class="text">NodeRegistry</text>
+  
+  <rect x="50" y="220" width="200" height="30" class="core" rx="5"/>
+  <text x="150" y="240" class="text">EventSystem</text>
+  
+  <!-- State Management -->
+  <rect x="300" y="60" width="200" height="40" class="state" rx="5"/>
+  <text x="400" y="85" class="text">GameState</text>
+  
+  <rect x="300" y="120" width="200" height="30" class="state" rx="5"/>
+  <text x="400" y="140" class="text">WaidrinState</text>
+  
+  <rect x="300" y="170" width="200" height="30" class="state" rx="5"/>
+  <text x="400" y="190" class="text">MemoryState</text>
+  
+  <rect x="300" y="220" width="200" height="30" class="state" rx="5"/>
+  <text x="400" y="240" class="text">PluginState</text>
+  
+  <!-- Game Nodes -->
+  <rect x="550" y="60" width="200" height="40" class="nodes" rx="5"/>
+  <text x="650" y="85" class="text">CoreNodes</text>
+  
+  <rect x="550" y="120" width="200" height="30" class="nodes" rx="5"/>
+  <text x="650" y="140" class="text">DynamicNodes</text>
+  
+  <rect x="550" y="170" width="200" height="30" class="nodes" rx="5"/>
+  <text x="650" y="190" class="text">UtilityNodes</text>
+  
+  <!-- Specific Nodes -->
+  <rect x="800" y="60" width="150" height="25" class="nodes" rx="5"/>
+  <text x="875" y="77" class="text">WelcomeNode</text>
+  
+  <rect x="800" y="95" width="150" height="25" class="nodes" rx="5"/>
+  <text x="875" y="112" class="text">ChatNode</text>
+  
+  <rect x="800" y="130" width="150" height="25" class="nodes" rx="5"/>
+  <text x="875" y="147" class="text">NarrationNode</text>
+  
+  <rect x="800" y="165" width="150" height="25" class="nodes" rx="5"/>
+  <text x="875" y="182" class="text">ActionNode</text>
+  
+  <!-- Tool System -->
+  <rect x="50" y="320" width="200" height="40" class="tools" rx="5"/>
+  <text x="150" y="345" class="text">LLMTools</text>
+  
+  <rect x="50" y="380" width="200" height="30" class="tools" rx="5"/>
+  <text x="150" y="400" class="text">CharacterTools</text>
+  
+  <rect x="50" y="430" width="200" height="30" class="tools" rx="5"/>
+  <text x="150" y="450" class="text">MemoryTools</text>
+  
+  <!-- Backend Integration -->
+  <rect x="300" y="320" width="200" height="40" class="backend" rx="5"/>
+  <text x="400" y="345" class="text">WaidrinBackend</text>
+  
+  <rect x="300" y="380" width="200" height="30" class="backend" rx="5"/>
+  <text x="400" y="400" class="text">OpenAIClient</text>
+  
+  <rect x="300" y="430" width="200" height="30" class="backend" rx="5"/>
+  <text x="400" y="450" class="text">StreamingHandler</text>
+  
+  <!-- Plugin System -->
+  <rect x="550" y="320" width="200" height="40" class="plugin" rx="5"/>
+  <text x="650" y="345" class="text">PluginRegistry</text>
+  
+  <rect x="550" y="380" width="200" height="30" class="plugin" rx="5"/>
+  <text x="650" y="400" class="text">PluginLoader</text>
+  
+  <rect x="550" y="430" width="200" height="30" class="plugin" rx="5"/>
+  <text x="650" y="450" class="text">PluginExecutor</text>
+  
+  <!-- External Dependencies -->
+  <rect x="800" y="320" width="150" height="30" class="external" rx="5"/>
+  <text x="875" y="340" class="text">LangGraph</text>
+  
+  <rect x="800" y="360" width="150" height="30" class="external" rx="5"/>
+  <text x="875" y="380" class="text">LangChain</text>
+  
+  <rect x="800" y="400" width="150" height="30" class="external" rx="5"/>
+  <text x="875" y="420" class="text">Zod</text>
+  
+  <rect x="800" y="440" width="150" height="30" class="external" rx="5"/>
+  <text x="875" y="460" class="text">Zustand</text>
+  
+  <!-- Arrows showing dependencies -->
+  <!-- Core Engine to State -->
+  <line x1="250" y1="80" x2="300" y2="80" class="arrow"/>
+  
+  <!-- Core Engine to Nodes -->
+  <line x1="250" y1="100" x2="550" y2="100" class="arrow"/>
+  
+  <!-- State to Tools -->
+  <line x1="400" y1="280" x2="150" y2="320" class="arrow"/>
+  
+  <!-- Nodes to Tools -->
+  <line x1="650" y1="200" x2="150" y2="320" class="arrow"/>
+  
+  <!-- Tools to Backend -->
+  <line x1="250" y1="340" x2="300" y2="340" class="arrow"/>
+  
+  <!-- Backend to External -->
+  <line x1="500" y1="340" x2="800" y2="340" class="arrow"/>
+  
+  <!-- Core Engine to External -->
+  <line x1="150" y1="280" x2="875" y2="350" class="arrow"/>
+  
+  <!-- Legend -->
+  <rect x="50" y="550" width="300" height="200" fill="#f9f9f9" stroke="#ccc" rx="5"/>
+  <text x="200" y="575" class="text" font-weight="bold">Legend</text>
+  
+  <rect x="70" y="590" width="20" height="15" class="core"/>
+  <text x="100" y="602" class="text">Core Engine</text>
+  
+  <rect x="70" y="615" width="20" height="15" class="state"/>
+  <text x="100" y="627" class="text">State Management</text>
+  
+  <rect x="70" y="640" width="20" height="15" class="nodes"/>
+  <text x="100" y="652" class="text">Game Nodes</text>
+  
+  <rect x="70" y="665" width="20" height="15" class="tools"/>
+  <text x="100" y="677" class="text">Tool System</text>
+  
+  <rect x="70" y="690" width="20" height="15" class="backend"/>
+  <text x="100" y="702" class="text">Backend Integration</text>
+  
+  <rect x="70" y="715" width="20" height="15" class="external"/>
+  <text x="100" y="727" class="text">External Dependencies</text>
+  
+  <!-- Data Flow Description -->
+  <rect x="400" y="550" width="600" height="200" fill="#f9f9f9" stroke="#ccc" rx="5"/>
+  <text x="700" y="575" class="text" font-weight="bold">Data Flow</text>
+  
+  <text x="700" y="600" class="text" font-size="10">1. User Input → Input Processor → State Validator</text>
+  <text x="700" y="620" class="text" font-size="10">2. Node Selector → Node Executor → Tool Executor</text>
+  <text x="700" y="640" class="text" font-size="10">3. LLM Provider → Response Processor → State Updater</text>
+  <text x="700" y="660" class="text" font-size="10">4. Event Emitter → UI Updater → User Feedback</text>
+  <text x="700" y="680" class="text" font-size="10">5. Memory System tracks all interactions and context</text>
+  <text x="700" y="700" class="text" font-size="10">6. Plugin System extends functionality dynamically</text>
+  <text x="700" y="720" class="text" font-size="10">7. Error Handling provides recovery and fallbacks</text>
+</svg>

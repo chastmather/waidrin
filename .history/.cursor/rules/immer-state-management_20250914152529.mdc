@@ -1,0 +1,143 @@
+---
+description: Immer state management patterns and best practices
+globs: lib/state.ts,lib/engine-original.ts,lib/engines/current/state.ts
+---
+
+# Immer State Management Rules
+
+## Core Principles
+
+### Draft Mutations
+- **Only mutate Immer drafts within producer functions**
+- Never mutate drafts in async callbacks or external functions
+- Use `current()` to get immutable snapshots when needed
+
+### Async State Updates
+- Use `setAsync` for async operations that modify state
+- The current implementation uses an "anti-pattern" but it's intentional
+- Prevents manual updates during state machine operations
+
+## State Store Pattern
+
+### Zustand + Immer Integration
+```typescript
+export const useStateStore = create<StoredState>()(
+  persist(
+    immer((set, get) => ({
+      // ... state properties
+      set: set,
+      setAsync: async (updater) => {
+        await setAsyncMutex.runExclusive(async () => {
+          const state = get();
+          const draft = createDraft(state);
+          
+          try {
+            await updater(draft);
+          } catch (error) {
+            set(state); // Rollback on error
+            throw error;
+          }
+          
+          const newState = finishDraft(draft);
+          set(newState);
+        });
+      },
+    })),
+    // ... persist config
+  ),
+);
+```
+
+## Streaming State Updates
+
+### Correct Pattern
+```typescript
+// ✅ CORRECT - Don't mutate draft in async callback
+event.text = await backend.getNarration(prompt, (token: string, count: number) => {
+  onToken(token, count);  // Handle progress
+  updateState();          // Trigger state update
+});
+// event.text gets complete response from backend
+```
+
+### Anti-Pattern
+```typescript
+// ❌ WRONG - Mutating draft in async callback
+event.text = await backend.getNarration(prompt, (token: string, count: number) => {
+  event.text += token;    // Draft mutation in callback
+  onToken(token, count);
+  updateState();
+});
+```
+
+## State Update Functions
+
+### updateState Pattern
+- Throttled to 200ms intervals
+- Uses `current(state)` to get immutable snapshot
+- Called during streaming for real-time updates
+
+```typescript
+const updateState = throttle(
+  () => {
+    getState().set(current(state));
+  },
+  state.updateInterval,
+  { leading: true, trailing: true },
+);
+```
+
+## Error Handling
+
+### Rollback on Error
+- State changes are rolled back if updater throws
+- Original state is restored before re-throwing
+- Prevents inconsistent state from partial updates
+
+### Mutex Protection
+- `setAsyncMutex` prevents concurrent state updates
+- Ensures state consistency during async operations
+- Critical for preventing race conditions
+
+## Development Guidelines
+
+### When to Use setAsync
+- Any async operation that modifies state
+- Streaming operations that need progress updates
+- Complex state machine operations
+
+### When to Use set
+- Synchronous state updates
+- Simple property changes
+- Immediate state modifications
+
+### Draft Mutation Rules
+1. Only mutate within the updater function
+2. Never mutate in callbacks or external functions
+3. Use separate variables for async accumulation
+4. Assign final values to draft at the end
+
+## Common Patterns
+
+### Streaming Accumulation
+```typescript
+// Accumulate in separate variable
+let streamingText = "";
+// ... async operation ...
+// Assign final result to draft
+event.text = streamingText;
+```
+
+### State Updates During Async
+```typescript
+// Use updateState for progress updates
+const updateState = throttle(() => {
+  getState().set(current(state));
+}, state.updateInterval);
+```
+
+## File References
+
+- [lib/state.ts](mdc:lib/state.ts) - Main state store implementation
+- [lib/engine-original.ts](mdc:lib/engine-original.ts) - Streaming implementation
+- [lib/engines/current/state.ts](mdc:lib/engines/current/state.ts) - Current engine state

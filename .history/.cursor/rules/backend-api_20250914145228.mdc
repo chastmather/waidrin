@@ -1,0 +1,115 @@
+---
+globs: lib/backend.ts,lib/prompts.ts,app/plugins/route.ts
+---
+
+# Backend and API Integration Rules
+
+## Backend Architecture
+
+- **Interface Pattern**: Use the `Backend` interface for all LLM integrations
+- **Default Implementation**: `DefaultBackend` provides OpenAI-compatible API integration
+- **Plugin System**: Backends can be provided by plugins
+- **Abort Support**: All backends must support request cancellation
+
+## Backend Interface
+
+```typescript
+interface Backend {
+  getNarration(prompt: Prompt, onToken?: TokenCallback): Promise<string>;
+  getObject<Schema extends z.ZodType, Type extends z.infer<Schema>>(
+    prompt: Prompt,
+    schema: Schema,
+    onToken?: TokenCallback,
+  ): Promise<Type>;
+  abort(): void;
+  isAbortError(error: unknown): boolean;
+}
+```
+
+## LLM Integration Patterns
+
+### Prompt Structure
+- **System Prompts**: Define the AI's role and behavior
+- **User Prompts**: Provide context and specific requests
+- **Schema Validation**: Use Zod schemas for structured output
+- **Token Callbacks**: Provide real-time progress updates
+
+### Response Handling
+- **Streaming**: Support streaming responses for better UX
+- **Error Handling**: Distinguish between abort errors and other errors
+- **Validation**: Parse and validate all responses with Zod schemas
+- **Logging**: Support debug logging for prompts and responses
+
+## API Configuration
+
+### Settings Structure
+```typescript
+interface DefaultBackendSettings {
+  apiUrl: string;
+  apiKey: string;
+  model: string;
+  generationParams: Record<string, unknown>;
+  narrationParams: Record<string, unknown>;
+}
+```
+
+### Parameter Management
+- **Generation Params**: Control structured output generation
+- **Narration Params**: Control narrative text generation
+- **Temperature**: Different settings for different use cases
+- **Token Limits**: Appropriate limits for different operations
+
+## Plugin System Integration
+
+### Plugin Backend Support
+- **Backend Registration**: Plugins can register custom backends
+- **Backend Selection**: Users can choose active backend
+- **Settings Management**: Backend-specific settings support
+- **Error Handling**: Graceful fallback to default backend
+
+### Plugin API Routes
+- **Manifest Endpoint**: `/plugins` returns available plugins
+- **Dynamic Loading**: Load plugins at runtime
+- **Settings Persistence**: Save plugin settings in state
+- **Error Recovery**: Handle plugin loading failures
+
+## Error Handling
+
+### Abort Errors
+- **User Cancellation**: Detect when user cancels operations
+- **Graceful Handling**: Don't show error messages for user cancellations
+- **Resource Cleanup**: Properly clean up aborted requests
+
+### API Errors
+- **Network Issues**: Handle connection problems
+- **Authentication**: Handle API key issues
+- **Rate Limiting**: Handle rate limit responses
+- **Schema Validation**: Handle malformed responses
+
+## Performance Considerations
+
+### Streaming
+- **Token Callbacks**: Provide real-time updates
+- **Throttling**: Throttle updates to prevent UI lag
+- **Progress Indicators**: Show meaningful progress information
+- **Cancellation**: Support request cancellation
+
+### Caching
+- **Response Caching**: Cache responses when appropriate
+- **State Persistence**: Persist state across sessions
+- **Plugin Caching**: Cache loaded plugins
+- **Settings Caching**: Cache backend settings
+
+## Security
+
+### API Keys
+- **Browser Storage**: Store API keys securely
+- **Environment Variables**: Support environment-based configuration
+- **Key Validation**: Validate API keys before use
+- **Error Messages**: Don't expose sensitive information in errors
+
+### Request Security
+- **CORS**: Handle cross-origin requests properly
+- **Content Security**: Validate all responses
+- **Input Sanitization**: Sanitize user inputs
+- **Error Information**: Limit error information exposure

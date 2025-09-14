@@ -1,0 +1,175 @@
+---
+globs: lib/schemas.ts,lib/engines/*/schemas.ts
+description: Zod validation schemas and data validation patterns
+---
+
+# Validation Schemas
+
+## Schema Architecture
+
+Waidrin uses Zod v4 for comprehensive data validation and type safety:
+
+- **Main Schemas**: [lib/schemas.ts](mdc:lib/schemas.ts) - Core game schemas
+- **Engine Schemas**: Engine-specific validation schemas
+- **Type Safety**: Full TypeScript integration with Zod
+
+## Core Schemas
+
+### Game State Schema
+```typescript
+export const State = z.object({
+  apiUrl: z.url(),
+  apiKey: z.string().trim(),
+  model: z.string().trim(),
+  contextLength: z.int(),
+  inputLength: z.int(),
+  generationParams: RequestParams,
+  narrationParams: RequestParams,
+  updateInterval: z.int(),
+  logPrompts: z.boolean(),
+  logParams: z.boolean(),
+  logResponses: z.boolean(),
+  view: View,
+  world: World,
+  locations: Location.array(),
+  characters: Character.array(),
+  protagonist: Character,
+  // ... additional properties
+});
+```
+
+### Event Schemas
+```typescript
+export const ActionEvent = z.object({
+  type: z.literal("action"),
+  action: Action,
+});
+
+export const NarrationEvent = z.object({
+  type: z.literal("narration"),
+  text: Text.max(5000),
+  locationIndex: Index,
+  referencedCharacterIndices: Index.array(),
+});
+
+export const Event = z.discriminatedUnion("type", [
+  ActionEvent,
+  NarrationEvent,
+  CharacterIntroductionEvent,
+  LocationChangeEvent,
+]);
+```
+
+## Schema Patterns
+
+### Text Validation
+```typescript
+const Text = z.string().trim().nonempty();
+const Name = Text.max(100);
+const Description = Text.max(2000);
+const Action = Text.max(200);
+```
+
+### Enum Schemas
+```typescript
+export const View = z.enum(["welcome", "connection", "genre", "character", "scenario", "chat"]);
+export const Gender = z.enum(["male", "female"]);
+export const Race = z.enum(["human", "elf", "dwarf"]);
+```
+
+### Object Schemas
+```typescript
+export const Character = z.object({
+  name: Name,
+  gender: Gender,
+  race: Race,
+  biography: Description,
+  locationIndex: Index,
+});
+```
+
+## LangGraph Schemas
+
+### Game State Annotation
+```typescript
+export const GameStateAnnotation = Annotation.Root({
+  currentNode: Annotation<string>,
+  nodeHistory: Annotation<Array<{ nodeId: string; timestamp: string; duration: number; success: boolean }>>,
+  memory: Annotation<Record<string, unknown>>,
+  gameFlow: Annotation<{ currentPhase: string; completedPhases: string[]; nextPhase: string | null }>,
+  streaming: Annotation<{ isStreaming: boolean; streamId: string | null; buffer: string[] }>,
+  // ... additional properties
+});
+```
+
+### Node Context Schema
+```typescript
+export const NodeContextSchema = z.object({
+  nodeId: z.string(),
+  nodeType: z.string(),
+  input: z.unknown(),
+  previousNode: z.string().optional(),
+  nextNodes: z.array(z.string()).default([]),
+  executionTime: z.number().optional(),
+  retryCount: z.number().default(0),
+  maxRetries: z.number().default(3),
+});
+```
+
+## Validation Patterns
+
+### Runtime Validation
+```typescript
+// Parse and validate data
+const validatedData = schema.parse(inputData);
+
+// Safe parsing with error handling
+const result = schema.safeParse(inputData);
+if (result.success) {
+  // Use validated data
+  const data = result.data;
+} else {
+  // Handle validation errors
+  console.error(result.error);
+}
+```
+
+### Type Inference
+```typescript
+// Infer TypeScript types from schemas
+export type State = z.infer<typeof State>;
+export type Character = z.infer<typeof Character>;
+export type Event = z.infer<typeof Event>;
+```
+
+## Error Handling
+
+### Validation Errors
+- Use `safeParse` for error handling
+- Provide clear error messages
+- Handle validation failures gracefully
+
+### Schema Evolution
+- Use optional fields for backward compatibility
+- Version schemas when making breaking changes
+- Provide migration utilities
+
+## Development Guidelines
+
+### Creating New Schemas
+1. Define schema in appropriate file
+2. Export TypeScript type
+3. Add to main schema exports
+4. Test validation thoroughly
+
+### Schema Design
+- Use descriptive names
+- Add appropriate constraints
+- Consider backward compatibility
+- Document schema purpose
+
+### Testing Schemas
+- Test valid inputs
+- Test invalid inputs
+- Test edge cases
+- Verify type inference

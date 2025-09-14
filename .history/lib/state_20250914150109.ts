@@ -27,7 +27,7 @@ export type Event = z.infer<typeof schemas.Event>;
 export type State = z.infer<typeof schemas.State>;
 
 export const initialState: State = schemas.State.parse({
-  apiUrl: process.env.OPENAI_API_URL || "https://api.openai.com/v1/",
+  apiUrl: process.env.OPENAI_API_URL,
   apiKey: process.env.OPENAI_API_KEY || "",
   model: process.env.OPENAI_MODEL || "",
   contextLength: 16384,

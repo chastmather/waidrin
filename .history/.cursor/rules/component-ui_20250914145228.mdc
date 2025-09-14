@@ -1,0 +1,97 @@
+---
+globs: components/*.tsx,views/*.tsx
+---
+
+# Component and UI Development Rules
+
+## UI Framework
+
+- **Radix UI**: Use Radix UI components from `@radix-ui/themes`
+- **Theme**: Dark theme with plum accent color
+- **Typography**: Grenze and Cinzel Decorative fonts
+- **Icons**: React Icons library for consistent iconography
+
+## Component Structure
+
+### View Components (views/)
+- **Single Responsibility**: Each view handles one game state
+- **Props Pattern**: Use callback props for navigation (`onNext`, `onBack`)
+- **State Access**: Use `useShallow` for performance optimization
+- **Error Handling**: Display user-friendly error messages
+
+### Reusable Components (components/)
+- **Composition**: Build complex UIs from simple, composable components
+- **Props Interface**: Define clear TypeScript interfaces for props
+- **Default Props**: Use default parameters instead of defaultProps
+- **Event Handlers**: Use descriptive names for event handlers
+
+## Component Patterns
+
+```typescript
+// View component pattern
+interface ViewProps {
+  onNext: () => void;
+  onBack: () => void;
+}
+
+export default function ViewName({ onNext, onBack }: ViewProps) {
+  const { stateProperty } = useStateStore(
+    useShallow((state) => ({
+      stateProperty: state.property,
+    }))
+  );
+  
+  return (
+    <Container>
+      {/* View content */}
+    </Container>
+  );
+}
+```
+
+## Event Handling
+
+- **Async Operations**: Use try-catch for async operations
+- **Loading States**: Show processing overlays for long operations
+- **User Feedback**: Provide clear feedback for user actions
+- **Error Recovery**: Allow users to retry failed operations
+
+## Styling Guidelines
+
+- **CSS Classes**: Use Tailwind CSS classes for styling
+- **Responsive Design**: Design for mobile-first approach
+- **Accessibility**: Follow WCAG guidelines for accessibility
+- **Dark Theme**: Ensure all components work in dark theme
+
+## State Integration
+
+- **State Selectors**: Use specific selectors to minimize re-renders
+- **State Updates**: Use `setAsync` for complex state updates
+- **Loading States**: Show appropriate loading indicators
+- **Error States**: Handle and display errors gracefully
+
+## Component Categories
+
+### Event Views
+- **ActionEventView**: Display player actions
+- **NarrationEventView**: Display story narration
+- **CharacterIntroductionEventView**: Introduce new characters
+- **LocationChangeEventView**: Show location transitions
+
+### UI Components
+- **MainMenu**: Global navigation menu
+- **ErrorPopup**: Error display and recovery
+- **ProcessingOverlay**: Loading and progress indication
+- **StateDebugger**: Development debugging tool
+
+### Interactive Components
+- **ActionChoice**: Player action selection
+- **CharacterView**: Character display and interaction
+- **ImageOption**: Image-based selection interface
+
+## Performance Optimization
+
+- **Memoization**: Use React.memo for expensive components
+- **Shallow Comparison**: Use `useShallow` for Zustand selectors
+- **Lazy Loading**: Load components only when needed
+- **Throttling**: Throttle frequent updates to prevent performance issues

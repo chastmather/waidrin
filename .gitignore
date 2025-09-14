@@ -1,5 +1,5 @@
-# dependencies
-/node_modules
+# Dependencies
+node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -8,39 +8,199 @@
 !.yarn/releases
 !.yarn/versions
 
-# testing
+# Testing
 /coverage
+*.lcov
 
-# next.js
+# Next.js
 /.next/
 /out/
+.next/
+out/
 
-# production
+# Production
 /build
+/dist
 
-# misc
-.DS_Store
-*.pem
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
 
-# debug
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Debug logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+lerna-debug.log*
 
-# env files
-.env*.local
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
 
-# vercel
-.vercel
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+# nyc test coverage
+.nyc_output
 
-# editors
-/.vscode/
+# Dependency directories
+jspm_packages/
 
-# plugins
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional stylelint cache
+.stylelintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# Next.js build output
+.next
+
+# Nuxt.js build / generate output
+.nuxt
+dist
+
+# Gatsby files
+.cache/
+public
+
+# Storybook build outputs
+.out
+.storybook-out
+storybook-static
+
+# Temporary folders
+tmp/
+temp/
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Windows image file caches
+Thumbs.db
+ehthumbs.db
+
+# Folder config file
+Desktop.ini
+
+# Recycle Bin used on file shares
+$RECYCLE.BIN/
+
+# Windows Installer files
+*.cab
+*.msi
+*.msm
+*.msp
+
+# Windows shortcuts
+*.lnk
+
+# Editor history
+.history/
+
+# Plugins (except demo)
 /plugins/*
 !/plugins/demo-plugin/
+
+# Project specific
+BRANCH_REORGANIZATION_SUMMARY.md
+waidrin-loops.code-workspace
+
+# Lock files (keep package-lock.json but ignore others)
+yarn.lock
+pnpm-lock.yaml
+
+# Logs
+logs
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Optional npm cache directory
+.npm
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variables file
+.env
+.env.test
+.env.production
+
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test
+
+# Temporary files
+*.tmp
+*.temp
+
+# Build artifacts
+build/
+dist/
+out/
+
+# Test results
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Local development
+.local

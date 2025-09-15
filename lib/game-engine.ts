@@ -1,6 +1,6 @@
 import { StateGraph, END } from "@langchain/langgraph";
 import type { GameState, GameEvent, NodeContext } from "./game-state";
-import type { GameNode, NodeRegistry, NodeExecutionResult } from "./node-types";
+import type { NodeRegistry } from "./node-types";
 import { GameStateAnnotation } from "./game-state";
 
 /**
@@ -21,86 +21,46 @@ import { GameStateAnnotation } from "./game-state";
  * in Waidrin with a flexible, dynamic LangGraph-based system.
  */
 export class LangGraphGameEngine {
-  private graph: StateGraph<GameState>;           // LangGraph state machine
+  private compiledGraph: any;           // Compiled LangGraph state machine
   private nodeRegistry: NodeRegistry;             // Manages all game nodes
-  private eventListeners: Map<string, ((event: GameEvent) => void)[]>; // Event system
+  private eventListeners: Map<string, ((event: GameEvent) => void)[]> = new Map(); // Event system
   private isRunning = false;                      // Execution state
   private currentExecution: Promise<GameState> | null = null; // Current execution
 
   constructor(nodeRegistry: NodeRegistry) {
     this.nodeRegistry = nodeRegistry;  // Inject node registry
-    this.graph = this.createGraph();   // Build the state graph
+    this.compiledGraph = this.createGraph();   // Build and compile the state graph
   }
 
   /**
-   * Create the LangGraph state machine
-   * 
-   * ⚠️ UNCONFIRMED: Based on LangGraph docs, StateGraph constructor should take
-   * the annotation directly, not a configuration object.
+   * Create the LangGraph state machine using fluent builder pattern
+   * Based on LangGraph documentation: new StateGraph(Annotation).addNode().addEdge().compile()
    */
-  private createGraph(): StateGraph<GameState> {
-    // ⚠️ UNCONFIRMED: Based on LangGraph docs, constructor takes annotation directly
-    const graph = new StateGraph<GameState>(GameStateAnnotation);
-
-    // Add all game nodes
-    this.addGameNodes(graph);
-
-    // Add conditional edges for dynamic flow
-    this.addConditionalEdges(graph);
-
-    // ⚠️ UNCONFIRMED: LangGraph graphs must be compiled before use
-    // Based on documentation examples: .compile()
-    return graph.compile();
-  }
-
-  /**
-   * Add all game nodes to the graph
-   * 
-   * ⚠️ UNCONFIRMED: Based on LangGraph docs, need to add __start__ -> first node edge
-   */
-  private addGameNodes(graph: StateGraph<GameState>): void {
-    // Core game flow nodes
-    graph.addNode("welcome", this.createNodeWrapper("welcome"));
-    graph.addNode("connection", this.createNodeWrapper("connection"));
-    graph.addNode("genre", this.createNodeWrapper("genre"));
-    graph.addNode("character", this.createNodeWrapper("character"));
-    graph.addNode("scenario", this.createNodeWrapper("scenario"));
-    graph.addNode("chat", this.createNodeWrapper("chat"));
-
-    // Dynamic game nodes
-    graph.addNode("narration", this.createNodeWrapper("narration"));
-    graph.addNode("action_generation", this.createNodeWrapper("action_generation"));
-    graph.addNode("location_change", this.createNodeWrapper("location_change"));
-    graph.addNode("character_introduction", this.createNodeWrapper("character_introduction"));
-    graph.addNode("memory_update", this.createNodeWrapper("memory_update"));
-    graph.addNode("scene_summary", this.createNodeWrapper("scene_summary"));
-
-    // Utility nodes
-    graph.addNode("error_handling", this.createNodeWrapper("error_handling"));
-    graph.addNode("user_input", this.createNodeWrapper("user_input"));
-    graph.addNode("streaming", this.createNodeWrapper("streaming"));
-
-    // ⚠️ UNCONFIRMED: Add entry point - LangGraph requires __start__ -> first node
-    // Based on documentation examples: .addEdge("__start__", "agent")
-    graph.addEdge("__start__", "welcome");
-  }
-
-  /**
-   * Add conditional edges for dynamic game flow
-   */
-  private addConditionalEdges(graph: StateGraph<GameState>): void {
-    // Main game flow
-    graph.addEdge("welcome", "connection");
-    graph.addEdge("connection", "genre");
-    graph.addEdge("genre", "character");
-    graph.addEdge("character", "scenario");
-    graph.addEdge("scenario", "chat");
-
-    // Chat loop with dynamic branching
-    graph.addConditionalEdges(
-      "chat",
-      this.shouldContinueChat.bind(this),
-      {
+  private createGraph(): any {
+    // Use fluent builder pattern as per LangGraph documentation
+    return new StateGraph(GameStateAnnotation)
+      .addNode("welcome", this.createNodeFunction("welcome"))
+      .addNode("connection", this.createNodeFunction("connection"))
+      .addNode("genre", this.createNodeFunction("genre"))
+      .addNode("character", this.createNodeFunction("character"))
+      .addNode("scenario", this.createNodeFunction("scenario"))
+      .addNode("chat", this.createNodeFunction("chat"))
+      .addNode("narration", this.createNodeFunction("narration"))
+      .addNode("action_generation", this.createNodeFunction("action_generation"))
+      .addNode("location_change", this.createNodeFunction("location_change"))
+      .addNode("character_introduction", this.createNodeFunction("character_introduction"))
+      .addNode("memory_update", this.createNodeFunction("memory_update"))
+      .addNode("scene_summary", this.createNodeFunction("scene_summary"))
+      .addNode("error_handling", this.createNodeFunction("error_handling"))
+      .addNode("user_input", this.createNodeFunction("user_input"))
+      .addNode("streaming", this.createNodeFunction("streaming"))
+      .addEdge("__start__", "welcome")
+      .addEdge("welcome", "connection")
+      .addEdge("connection", "genre")
+      .addEdge("genre", "character")
+      .addEdge("character", "scenario")
+      .addEdge("scenario", "chat")
+      .addConditionalEdges("chat", this.shouldContinueChat.bind(this), {
         "narration": "narration",
         "action_generation": "action_generation",
         "location_change": "location_change",
@@ -111,112 +71,56 @@ export class LangGraphGameEngine {
         "streaming": "streaming",
         "error_handling": "error_handling",
         "end": END,
-      }
-    );
-
-    // Narration flow
-    graph.addConditionalEdges(
-      "narration",
-      this.afterNarration.bind(this),
-      {
+      })
+      .addConditionalEdges("narration", this.afterNarration.bind(this), {
         "action_generation": "action_generation",
         "memory_update": "memory_update",
         "chat": "chat",
-      }
-    );
-
-    // Action generation flow
-    graph.addConditionalEdges(
-      "action_generation",
-      this.afterActionGeneration.bind(this),
-      {
+      })
+      .addConditionalEdges("action_generation", this.afterActionGeneration.bind(this), {
         "user_input": "user_input",
         "chat": "chat",
-      }
-    );
-
-    // Location change flow
-    graph.addConditionalEdges(
-      "location_change",
-      this.afterLocationChange.bind(this),
-      {
+      })
+      .addConditionalEdges("location_change", this.afterLocationChange.bind(this), {
         "character_introduction": "character_introduction",
         "narration": "narration",
         "chat": "chat",
-      }
-    );
-
-    // Character introduction flow
-    graph.addConditionalEdges(
-      "character_introduction",
-      this.afterCharacterIntroduction.bind(this),
-      {
+      })
+      .addConditionalEdges("character_introduction", this.afterCharacterIntroduction.bind(this), {
         "narration": "narration",
         "memory_update": "memory_update",
         "chat": "chat",
-      }
-    );
-
-    // Memory update flow
-    graph.addConditionalEdges(
-      "memory_update",
-      this.afterMemoryUpdate.bind(this),
-      {
+      })
+      .addConditionalEdges("memory_update", this.afterMemoryUpdate.bind(this), {
         "chat": "chat",
         "scene_summary": "scene_summary",
-      }
-    );
-
-    // Scene summary flow
-    graph.addConditionalEdges(
-      "scene_summary",
-      this.afterSceneSummary.bind(this),
-      {
+      })
+      .addConditionalEdges("scene_summary", this.afterSceneSummary.bind(this), {
         "chat": "chat",
         "end": END,
-      }
-    );
-
-    // Error handling flow
-    graph.addConditionalEdges(
-      "error_handling",
-      this.afterErrorHandling.bind(this),
-      {
+      })
+      .addConditionalEdges("error_handling", this.afterErrorHandling.bind(this), {
         "chat": "chat",
         "retry": "chat",
         "end": END,
-      }
-    );
-
-    // User input flow
-    graph.addConditionalEdges(
-      "user_input",
-      this.afterUserInput.bind(this),
-      {
+      })
+      .addConditionalEdges("user_input", this.afterUserInput.bind(this), {
         "chat": "chat",
         "narration": "narration",
         "action_generation": "action_generation",
-      }
-    );
-
-    // Streaming flow
-    graph.addConditionalEdges(
-      "streaming",
-      this.afterStreaming.bind(this),
-      {
+      })
+      .addConditionalEdges("streaming", this.afterStreaming.bind(this), {
         "chat": "chat",
         "narration": "narration",
-      }
-    );
+      })
+      .compile();
   }
 
   /**
-   * Create a node wrapper that handles execution and error handling
-   * 
-   * ⚠️ UNCONFIRMED: Based on LangGraph docs, node functions should return
-   * state updates (Partial<State>), not the full state. This needs validation.
+   * Create a simple node function following LangGraph patterns
+   * Based on documentation: async function callModel(state) { return { messages: [response] }; }
    */
-  private createNodeWrapper(nodeId: string) {
+  private createNodeFunction(nodeId: string) {
     return async (state: GameState): Promise<Partial<GameState>> => {
       try {
         this.emitEvent({
@@ -227,10 +131,14 @@ export class LangGraphGameEngine {
           nodeId,
         });
 
-        const node = this.nodeRegistry.createNode(nodeId, {});
+        const node = this.nodeRegistry[nodeId];
+        if (!node) {
+          throw new Error(`Node ${nodeId} not found in registry`);
+        }
+
         const context: NodeContext = {
           nodeId,
-          nodeType: node.nodeType,
+          nodeType: node.nodeType || "unknown",
           input: state,
           previousNode: state.currentNode,
           nextNodes: [],
@@ -251,11 +159,11 @@ export class LangGraphGameEngine {
           nodeId,
         });
 
-        // ⚠️ UNCONFIRMED: Return only state updates, not full state
-        // Based on LangGraph documentation examples: return {"topic": state["topic"] + " and cats"}
+        // Return state updates as per LangGraph documentation
         return {
           currentNode: nodeId,
           nodeHistory: [
+            ...state.nodeHistory,
             {
               nodeId,
               timestamp: new Date().toISOString(),
@@ -264,7 +172,9 @@ export class LangGraphGameEngine {
             },
           ],
           performance: {
+            ...state.performance,
             nodeExecutionTimes: {
+              ...state.performance.nodeExecutionTimes,
               [nodeId]: executionTime,
             },
             totalExecutionTime: state.performance.totalExecutionTime + executionTime,
@@ -281,9 +191,9 @@ export class LangGraphGameEngine {
           nodeId,
         });
 
-        // ⚠️ UNCONFIRMED: Return only error state updates
         return {
           errors: [
+            ...state.errors,
             {
               id: crypto.randomUUID(),
               message: error instanceof Error ? error.message : String(error),
@@ -296,6 +206,8 @@ export class LangGraphGameEngine {
       }
     };
   }
+
+
 
   /**
    * Conditional edge functions
@@ -321,27 +233,27 @@ export class LangGraphGameEngine {
   private afterLocationChange(state: GameState): string {
     // Check if new characters need to be introduced
     const hasNewCharacters = state.characters.some(char => 
-      !state.memory.characterRelationships[char.name]
+      !state.memory.characterRelationships?.[char.name]
     );
     if (hasNewCharacters) return "character_introduction";
     return "narration";
   }
 
-  private afterCharacterIntroduction(state: GameState): string {
+  private afterCharacterIntroduction(_state: GameState): string {
     return "narration";
   }
 
   private afterMemoryUpdate(state: GameState): string {
     // Check if scene should be summarized
     const recentEvents = state.events.slice(-10);
-    const hasLocationChange = recentEvents.some(event => 
+    const hasLocationChange = recentEvents.some((event: any) => 
       event.type === "location_change"
     );
     if (hasLocationChange) return "scene_summary";
     return "chat";
   }
 
-  private afterSceneSummary(state: GameState): string {
+  private afterSceneSummary(_state: GameState): string {
     return "chat";
   }
 
@@ -375,26 +287,28 @@ export class LangGraphGameEngine {
       type: "game_started",
       data: { initialState },
       timestamp: new Date().toISOString(),
+      nodeId: "game_engine",
     });
 
     try {
-      const compiledGraph = this.graph.compile();
-      const result = await compiledGraph.invoke(initialState);
+      const result = await this.compiledGraph.invoke(initialState);
       
       this.emitEvent({
         id: crypto.randomUUID(),
         type: "game_ended",
         data: { finalState: result },
         timestamp: new Date().toISOString(),
+        nodeId: "game_engine",
       });
 
-      return result;
+      return result as GameState;
     } catch (error) {
       this.emitEvent({
         id: crypto.randomUUID(),
         type: "error_occurred",
         data: { error: error instanceof Error ? error.message : String(error) },
         timestamp: new Date().toISOString(),
+        nodeId: "game_engine",
       });
       throw error;
     } finally {
@@ -414,6 +328,7 @@ export class LangGraphGameEngine {
       type: "game_paused",
       data: {},
       timestamp: new Date().toISOString(),
+      nodeId: "game_engine",
     });
   }
 
@@ -426,6 +341,7 @@ export class LangGraphGameEngine {
       type: "game_resumed",
       data: {},
       timestamp: new Date().toISOString(),
+      nodeId: "game_engine",
     });
   }
 
@@ -441,6 +357,7 @@ export class LangGraphGameEngine {
       type: "game_ended",
       data: {},
       timestamp: new Date().toISOString(),
+      nodeId: "game_engine",
     });
   }
 

@@ -14,8 +14,14 @@ export const GameStateAnnotation = Annotation.Root({
   // Core game state properties
   currentNode: Annotation<string>,
   nodeHistory: Annotation<Array<{ nodeId: string; timestamp: string; duration: number; success: boolean }>>,
-  memory: Annotation<Record<string, unknown>>,
-  gameFlow: Annotation<{ currentPhase: string; completedPhases: string[]; nextPhase: string | null }>,
+  memory: Annotation<Record<string, unknown> & { characterRelationships?: Record<string, unknown> }>,
+  gameFlow: Annotation<{ 
+    currentPhase: string; 
+    completedPhases: string[]; 
+    nextPhase: string | null;
+    requiresUserInput: boolean;
+    pendingUserInput: boolean;
+  }>,
   streaming: Annotation<{ isStreaming: boolean; streamId: string | null; buffer: string[] }>,
   plugins: Annotation<Record<string, unknown>>,
   errors: Annotation<Array<{ id: string; message: string; nodeId: string; timestamp: string; resolved: boolean }>>,
@@ -40,6 +46,7 @@ export type GameState = typeof GameStateAnnotation.State;
 // Event Types for LangGraph Nodes
 // ============================================================================
 export interface GameEvent {
+  id: string;
   type: string;
   data: Record<string, unknown>;
   timestamp: string;
@@ -47,8 +54,12 @@ export interface GameEvent {
 }
 
 export interface NodeContext {
-  state: GameState;
-  event: GameEvent;
-  memory: Record<string, unknown>;
-  config: Record<string, unknown>;
+  nodeId: string;
+  nodeType: string;
+  input: GameState;
+  previousNode: string;
+  nextNodes: string[];
+  executionTime: number;
+  retryCount: number;
+  maxRetries: number;
 }

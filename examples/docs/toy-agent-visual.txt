@@ -1,0 +1,204 @@
+# Toy Narrative Chat Agent - Visual Graph Structure
+
+## LangGraph Flow Diagram
+
+```
+                    ┌─────────────────┐
+                    │   __start__     │
+                    └─────────┬───────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+                    │  process_input  │
+                    │                 │
+                    │ • Validates user│
+                    │   input         │
+                    │ • Adds user msg │
+                    │ • Sets generating│
+                    │   flag          │
+                    └─────────┬───────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+                    │generate_narrative│
+                    │                 │
+                    │ • Creates prompt│
+                    │ • Calls backend │
+                    │ • Streams tokens│
+                    │ • Adds assistant│
+                    │   message       │
+                    └─────────┬───────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+                    │ update_history  │
+                    │                 │
+                    │ • Saves current │
+                    │   narrative     │
+                    │ • Updates       │
+                    │   history array │
+                    └─────────┬───────┘
+                              │
+                              │ shouldHandleError()
+                              ▼
+                    ┌─────────────────┐
+                    │  error_handling │◄─────────────┐
+                    │                 │              │
+                    │ • Marks errors  │              │
+                    │   as resolved   │              │
+                    │ • Cleans up     │              │
+                    │   error state   │              │
+                    └─────────┬───────┘              │
+                              │                      │
+                              │ afterErrorHandling() │
+                              ▼                      │
+                    ┌─────────────────┐              │
+                    │      END        │              │
+                    └─────────────────┘              │
+                                                     │
+                    ┌─────────────────┐              │
+                    │generate_narrative│◄─────────────┘
+                    │                 │
+                    │ (Retry after    │
+                    │  error handling)│
+                    └─────────────────┘
+```
+
+## State Flow Patterns
+
+### Normal Success Flow
+```
+__start__ → process_input → generate_narrative → update_history → END
+```
+
+### Error Recovery Flow
+```
+__start__ → process_input → generate_narrative → update_history → error_handling → generate_narrative → update_history → END
+```
+
+### Retry Loop (if error persists)
+```
+error_handling → generate_narrative → update_history → error_handling → ...
+```
+
+## Node Responsibilities
+
+### process_input
+- ✅ Input validation
+- ✅ User message creation
+- ✅ Generation flag setting
+- ❌ Error handling for invalid input
+
+### generate_narrative
+- ✅ Prompt construction
+- ✅ Backend API calls
+- ✅ Token streaming
+- ✅ Assistant message creation
+- ❌ Error handling for API failures
+
+### update_history
+- ✅ Narrative persistence
+- ✅ History management
+- ✅ Continuity preservation
+
+### error_handling
+- ✅ Error resolution
+- ✅ State cleanup
+- ✅ Retry enablement
+
+## Conditional Logic
+
+### shouldHandleError()
+```
+IF errors.length > 0 AND lastError.resolved = false
+  THEN → error_handling
+ELSE
+  THEN → END
+```
+
+### afterErrorHandling()
+```
+IF lastError.resolved = true
+  THEN → generate_narrative (retry)
+ELSE
+  THEN → END
+```
+
+## Backend Integration Points
+
+### ToyBackend Interface
+```
+┌─────────────────┐
+│   ToyBackend    │
+├─────────────────┤
+│ • OpenAI Client │
+│ • Streaming     │
+│ • Error Handling│
+│ • Abort Support │
+└─────────────────┘
+         │
+         ▼
+┌─────────────────┐
+│  LangGraph      │
+│  Agent          │
+├─────────────────┤
+│ • State Graph   │
+│ • Node Logic    │
+│ • Flow Control  │
+└─────────────────┘
+```
+
+## Data Flow
+
+### Input Processing
+```
+userInput → process_input → messages[] → generate_narrative
+```
+
+### Narrative Generation
+```
+messages[] → prompt → backend.getNarration() → assistantMessage → messages[]
+```
+
+### History Management
+```
+currentNarrative → update_history → narrativeHistory[]
+```
+
+### Error Management
+```
+errors[] → error_handling → resolved errors → retry flow
+```
+
+## Key Features
+
+1. **Linear Flow**: Simple sequential processing
+2. **Error Recovery**: Automatic retry mechanism
+3. **State Persistence**: Conversation and narrative history
+4. **Streaming Support**: Real-time token generation
+5. **Backend Abstraction**: Clean LLM integration
+6. **Conversation Continuity**: Multi-turn support
+
+## Usage Examples
+
+### Single Turn
+```typescript
+const agent = new ToyNarrativeChatAgent();
+const result = await agent.processInput("Tell me a story");
+```
+
+### Multi-Turn
+```typescript
+const agent = new ToyNarrativeChatAgent();
+const result1 = await agent.processInput("Start a story");
+const result2 = await agent.continueConversation(result1, "Continue");
+```
+
+### Streaming
+```typescript
+for await (const state of agent.streamConversation("Tell me a story")) {
+  console.log("State:", state);
+}
+```
+
+This graph represents a clean, linear LangGraph implementation focused on conversational AI with proper error handling and persistence.

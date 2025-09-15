@@ -11,7 +11,28 @@
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:watch": "vitest --watch"
+    "test:watch": "vitest --watch",
+    "example:chat": "tsx examples/toy-narrative-chat.ts",
+    "example:cli": "tsx examples/cli-chat.ts",
+    "example:test": "tsx examples/tests/test-examples.ts",
+    "draft:test": "tsx examples/tests/test-streaming-draft.ts",
+    "draft:actions": "tsx examples/tests/test-actions.ts",
+    "draft:v2:test": "tsx examples/tests/test-streaming-draft-v2.ts",
+    "draft:v3:test": "tsx examples/tests/test-streaming-draft-v3.ts",
+    "draft:v4:test": "tsx examples/tests/test-streaming-draft-v4.ts",
+    "draft:v4:backend:test": "tsx examples/tests/test-streaming-draft-v4-backend.ts",
+    "narrator:test": "tsx examples/tests/test-narrator-agent.ts",
+    "narrator:structure": "tsx examples/tests/test-narrator-structure.ts",
+    "narrator:enhanced": "tsx examples/tests/test-enhanced-graph.ts",
+    "narrator:persistent:test": "tsx examples/tests/test-persistent-cache-narrator.ts",
+    "narrator:persistent:simple": "tsx examples/tests/test-persistent-cache-simple.ts",
+    "deepseek:creative:test": "tsx examples/tests/test-deepseek-creative-agents.ts",
+    "game:test": "tsx examples/tests/test-game-agent.ts",
+    "deepseek:json:test": "tsx examples/tests/test-deepseek-json-direct.ts",
+    "simple:game:test": "tsx examples/tests/test-simple-game-agent.ts",
+    "branching:narrative:test": "tsx examples/tests/test-branching-narrative.ts",
+    "memory:bank:test": "tsx examples/tests/test-memory-bank-efficiency.ts",
+    "narrative:cli": "tsx examples/narrative-cli.ts"
   },
   "dependencies": {
     "@langchain/core": "^0.3.75",
@@ -48,6 +69,7 @@
     "@types/react-dom": "^19",
     "@vitest/ui": "^3.2.4",
     "tailwindcss": "^4",
+    "tsx": "^4.19.2",
     "typescript": "^5",
     "vitest": "^3.2.4"
   }

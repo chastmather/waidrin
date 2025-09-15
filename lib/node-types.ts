@@ -13,7 +13,8 @@ export interface GameNode {
   id: string;
   name: string;
   description?: string;
-  execute: (context: NodeContext) => Promise<NodeExecutionResult>;
+  nodeType: string;
+  execute: (state: GameState, context: NodeContext) => Promise<NodeExecutionResult>;
 }
 
 // ============================================================================

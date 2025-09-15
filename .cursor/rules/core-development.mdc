@@ -67,3 +67,4 @@ export default function ComponentName() {
 - **Quotes**: Use double quotes for strings
 - **Semicolons**: Always use semicolons
 - **Imports**: Organize imports automatically with Biome
+- **Development**: Do not remove unused types or imports until instructed
